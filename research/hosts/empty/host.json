@@ -1,0 +1,6 @@
+{
+  "name": "empty",
+  "framework": "none",
+  "entry": "src/main.js",
+  "html": "index.html"
+}

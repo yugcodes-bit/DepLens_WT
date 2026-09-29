@@ -1,0 +1,20 @@
+{
+  "name": "deplens",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Context-aware prediction of the browser runtime cost of npm dependencies",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "harness": "pnpm --filter @deplens/harness exec tsx src/cli.ts",
+    "fixtures": "node research/fixtures/generate.mjs"
+  },
+  "dependencies": {
+    "pnpm": "^12.6.0"
+  }
+}

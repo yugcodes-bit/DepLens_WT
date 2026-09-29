@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.work/
+*.log
+.env
+.env.*
+!.env.example
+coverage/
+__pycache__/
+.venv/
+ml/reports/*
+!ml/reports/.gitkeep
+research/fixtures/packages/

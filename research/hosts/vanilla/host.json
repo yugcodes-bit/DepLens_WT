@@ -1,0 +1,6 @@
+{
+  "name": "vanilla",
+  "framework": "vanilla",
+  "entry": "src/main.js",
+  "html": "index.html"
+}

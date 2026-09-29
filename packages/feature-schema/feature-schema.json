@@ -1,0 +1,645 @@
+{
+  "$comment": "Single source of truth for DepLens feature names (docs/08 §3). Bump schemaVersion on any change. G6 features are allowed only in the hybrid model.",
+  "schemaVersion": 1,
+  "groups": {
+    "G1": "package metadata",
+    "G2": "isolated bundle",
+    "G3": "in-context delta",
+    "G4": "code structure of added code",
+    "G5": "host context",
+    "G6": "measured (hybrid only)",
+    "G7": "profile"
+  },
+  "targets": [
+    {
+      "name": "delta_script_ms",
+      "description": "ΔScript: Δ(compile+eval+gc) main-thread thread-time in the load window, HL estimate of paired diffs",
+      "primary": true
+    },
+    {
+      "name": "delta_tbt_ms",
+      "description": "ΔTBT_load",
+      "primary": false
+    }
+  ],
+  "features": [
+    {
+      "name": "pkg_unpacked_bytes",
+      "group": "G1",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Unpacked tarball size",
+      "monotone": 1
+    },
+    {
+      "name": "pkg_js_files",
+      "group": "G1",
+      "type": "integer",
+      "unit": "count",
+      "description": "Number of .js/.mjs/.cjs files in the tarball"
+    },
+    {
+      "name": "pkg_format",
+      "group": "G1",
+      "type": "category",
+      "unit": null,
+      "description": "Module format of the resolved entry",
+      "values": [
+        "esm",
+        "cjs",
+        "dual",
+        "umd"
+      ]
+    },
+    {
+      "name": "pkg_has_exports_map",
+      "group": "G1",
+      "type": "boolean",
+      "unit": null,
+      "description": "package.json has an exports field"
+    },
+    {
+      "name": "pkg_sideeffects",
+      "group": "G1",
+      "type": "category",
+      "unit": null,
+      "description": "sideEffects declaration",
+      "values": [
+        "false",
+        "array",
+        "absent",
+        "true"
+      ]
+    },
+    {
+      "name": "pkg_n_deps",
+      "group": "G1",
+      "type": "integer",
+      "unit": "count",
+      "description": "Direct dependencies"
+    },
+    {
+      "name": "pkg_n_peer_deps",
+      "group": "G1",
+      "type": "integer",
+      "unit": "count",
+      "description": "Peer dependencies"
+    },
+    {
+      "name": "pkg_n_transitive",
+      "group": "G1",
+      "type": "integer",
+      "unit": "count",
+      "description": "Transitive runtime dependencies"
+    },
+    {
+      "name": "pkg_has_wasm",
+      "group": "G1",
+      "type": "boolean",
+      "unit": null,
+      "description": "Tarball contains .wasm files"
+    },
+    {
+      "name": "pkg_has_worker",
+      "group": "G1",
+      "type": "boolean",
+      "unit": null,
+      "description": "Package spawns or ships web workers"
+    },
+    {
+      "name": "pkg_ships_minified",
+      "group": "G1",
+      "type": "boolean",
+      "unit": null,
+      "description": "Resolved entry appears pre-bundled/minified"
+    },
+    {
+      "name": "iso_min_bytes",
+      "group": "G2",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Minified bytes of the import spec bundled alone (peers external)",
+      "monotone": 1
+    },
+    {
+      "name": "iso_gz_bytes",
+      "group": "G2",
+      "type": "number",
+      "unit": "bytes",
+      "description": "gzip-9 bytes of the isolated bundle",
+      "monotone": 1
+    },
+    {
+      "name": "iso_br_bytes",
+      "group": "G2",
+      "type": "number",
+      "unit": "bytes",
+      "description": "brotli-11 bytes of the isolated bundle",
+      "monotone": 1
+    },
+    {
+      "name": "iso_full_min_bytes",
+      "group": "G2",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Minified bytes of the full namespace import (Bundlephobia-style)",
+      "monotone": 1
+    },
+    {
+      "name": "iso_treeshake_ratio",
+      "group": "G2",
+      "type": "number",
+      "unit": "ratio",
+      "description": "iso_min_bytes / iso_full_min_bytes"
+    },
+    {
+      "name": "iso_modules",
+      "group": "G2",
+      "type": "integer",
+      "unit": "count",
+      "description": "Modules in the isolated bundle"
+    },
+    {
+      "name": "iso_packages",
+      "group": "G2",
+      "type": "integer",
+      "unit": "count",
+      "description": "Distinct packages in the isolated bundle"
+    },
+    {
+      "name": "iso_cjs_byte_share",
+      "group": "G2",
+      "type": "number",
+      "unit": "ratio",
+      "description": "Share of isolated bytes coming from CommonJS modules"
+    },
+    {
+      "name": "ctx_delta_min_bytes",
+      "group": "G3",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Exact Δ minified bytes of the initial load (treatment − baseline)",
+      "monotone": 1
+    },
+    {
+      "name": "ctx_delta_gz_bytes",
+      "group": "G3",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Exact Δ gzip bytes of the initial load",
+      "monotone": 1
+    },
+    {
+      "name": "ctx_delta_br_bytes",
+      "group": "G3",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Exact Δ brotli bytes of the initial load",
+      "monotone": 1
+    },
+    {
+      "name": "ctx_delta_modules",
+      "group": "G3",
+      "type": "integer",
+      "unit": "count",
+      "description": "Modules added to the initial load"
+    },
+    {
+      "name": "ctx_new_packages",
+      "group": "G3",
+      "type": "integer",
+      "unit": "count",
+      "description": "Packages new to the app"
+    },
+    {
+      "name": "ctx_shared_packages",
+      "group": "G3",
+      "type": "integer",
+      "unit": "count",
+      "description": "Candidate packages the app already ships"
+    },
+    {
+      "name": "ctx_shared_bytes_saved",
+      "group": "G3",
+      "type": "number",
+      "unit": "bytes",
+      "description": "iso_min_bytes − ctx_delta_min_bytes"
+    },
+    {
+      "name": "ctx_dup_versions",
+      "group": "G3",
+      "type": "integer",
+      "unit": "count",
+      "description": "New duplicate versions of packages already present"
+    },
+    {
+      "name": "ctx_in_initial_chunk",
+      "group": "G3",
+      "type": "boolean",
+      "unit": null,
+      "description": "Import lands in the initial chunk (false = lazy)"
+    },
+    {
+      "name": "ctx_delta_chunks",
+      "group": "G3",
+      "type": "integer",
+      "unit": "count",
+      "description": "New chunks created"
+    },
+    {
+      "name": "ast_nodes",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Total AST nodes in added code"
+    },
+    {
+      "name": "fn_count",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Functions (all kinds)"
+    },
+    {
+      "name": "fn_decl",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Function declarations"
+    },
+    {
+      "name": "fn_expr",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Function expressions"
+    },
+    {
+      "name": "fn_arrow",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Arrow functions"
+    },
+    {
+      "name": "toplevel_stmts",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Module-scope statements"
+    },
+    {
+      "name": "toplevel_calls",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Call expressions at module scope"
+    },
+    {
+      "name": "toplevel_new",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "new-expressions at module scope"
+    },
+    {
+      "name": "iife_count",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Immediately-invoked function expressions"
+    },
+    {
+      "name": "pife_count",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Parenthesized function expressions (V8 eager-compile heuristic)"
+    },
+    {
+      "name": "class_count",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Classes"
+    },
+    {
+      "name": "class_members",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Class members"
+    },
+    {
+      "name": "toplevel_loops",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Loops at module scope"
+    },
+    {
+      "name": "max_loop_depth",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Maximum loop nesting depth"
+    },
+    {
+      "name": "cyclomatic_sum",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Sum of decision points"
+    },
+    {
+      "name": "obj_literal_props",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Object literal properties"
+    },
+    {
+      "name": "template_literals",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Template literals"
+    },
+    {
+      "name": "regex_literals",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Regex literals"
+    },
+    {
+      "name": "regex_ctor_calls",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "new RegExp calls"
+    },
+    {
+      "name": "json_parse_calls",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "JSON.parse calls"
+    },
+    {
+      "name": "eval_like",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "eval / new Function"
+    },
+    {
+      "name": "try_catch",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "try/catch blocks"
+    },
+    {
+      "name": "async_fns",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "async functions"
+    },
+    {
+      "name": "generators",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "generator functions"
+    },
+    {
+      "name": "polyfill_signals",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Assignments to built-in prototypes/globals, core-js modules"
+    },
+    {
+      "name": "dom_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "DOM API references"
+    },
+    {
+      "name": "layout_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Forced-layout API references"
+    },
+    {
+      "name": "style_injection",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Style injection / CSS-in-JS runtime signals"
+    },
+    {
+      "name": "timer_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "setTimeout/setInterval references"
+    },
+    {
+      "name": "raf_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "requestAnimationFrame references"
+    },
+    {
+      "name": "idle_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "requestIdleCallback references"
+    },
+    {
+      "name": "observer_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Mutation/Resize/Intersection/Performance observers"
+    },
+    {
+      "name": "intl_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Intl.* constructors"
+    },
+    {
+      "name": "wasm_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "WebAssembly instantiation"
+    },
+    {
+      "name": "worker_refs",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Worker constructors"
+    },
+    {
+      "name": "dynamic_imports",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Dynamic import() calls"
+    },
+    {
+      "name": "toplevel_side_effect_score",
+      "group": "G4",
+      "type": "integer",
+      "unit": "count",
+      "description": "Module-scope statements that are not pure declarations/exports"
+    },
+    {
+      "name": "fn_bytes_share_toplevel",
+      "group": "G4",
+      "type": "number",
+      "unit": "ratio",
+      "description": "Share of added bytes outside any function (executed at load)"
+    },
+    {
+      "name": "largest_literal_bytes",
+      "group": "G4",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Largest object/array literal"
+    },
+    {
+      "name": "string_literal_bytes",
+      "group": "G4",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Total string literal bytes"
+    },
+    {
+      "name": "regenerator_runtime",
+      "group": "G4",
+      "type": "boolean",
+      "unit": null,
+      "description": "regenerator-runtime present in added code"
+    },
+    {
+      "name": "host_framework",
+      "group": "G5",
+      "type": "category",
+      "unit": null,
+      "description": "Host framework",
+      "values": [
+        "vanilla",
+        "react",
+        "vue",
+        "svelte",
+        "preact",
+        "solid",
+        "other"
+      ]
+    },
+    {
+      "name": "host_baseline_min_bytes",
+      "group": "G5",
+      "type": "number",
+      "unit": "bytes",
+      "description": "Host initial-load minified bytes (baseline)"
+    },
+    {
+      "name": "host_modules",
+      "group": "G5",
+      "type": "integer",
+      "unit": "count",
+      "description": "Modules in the host baseline"
+    },
+    {
+      "name": "host_packages",
+      "group": "G5",
+      "type": "integer",
+      "unit": "count",
+      "description": "Packages in the host baseline"
+    },
+    {
+      "name": "host_build_target",
+      "group": "G5",
+      "type": "category",
+      "unit": null,
+      "description": "Build target",
+      "values": [
+        "es2015",
+        "es2017",
+        "es2020",
+        "es2022",
+        "esnext"
+      ]
+    },
+    {
+      "name": "host_entry_eval_share",
+      "group": "G5",
+      "type": "number",
+      "unit": "ratio",
+      "description": "Share of baseline bytes in the entry chunk"
+    },
+    {
+      "name": "host_entry_task_ms_est",
+      "group": "G5",
+      "type": "number",
+      "unit": "ms",
+      "description": "Estimated duration of the entry-evaluation task (static estimate)"
+    },
+    {
+      "name": "iso_script_ms",
+      "group": "G6",
+      "type": "number",
+      "unit": "ms",
+      "description": "Isolated measured ΔScript (thread) at the same profile"
+    },
+    {
+      "name": "iso_compile_ms",
+      "group": "G6",
+      "type": "number",
+      "unit": "ms",
+      "description": "Isolated measured compile time"
+    },
+    {
+      "name": "iso_eval_ms",
+      "group": "G6",
+      "type": "number",
+      "unit": "ms",
+      "description": "Isolated measured eval time"
+    },
+    {
+      "name": "host_baseline_script_ms",
+      "group": "G6",
+      "type": "number",
+      "unit": "ms",
+      "description": "Host baseline script time (measured once per host)"
+    },
+    {
+      "name": "host_entry_task_ms",
+      "group": "G6",
+      "type": "number",
+      "unit": "ms",
+      "description": "Measured duration of the host's entry-evaluation task"
+    },
+    {
+      "name": "profile_slowdown",
+      "group": "G7",
+      "type": "number",
+      "unit": "factor",
+      "description": "Calibrated CPU slowdown of the profile",
+      "monotone": 1
+    }
+  ]
+}

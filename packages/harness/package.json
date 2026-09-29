@@ -1,0 +1,22 @@
+{
+  "name": "@deplens/harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Paired A/B measurement harness: inject an import into a host app, build, load in Chromium under CPU throttling, parse traces, estimate the incremental cost with CIs.",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0",
+    "playwright-core": "1.56.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
