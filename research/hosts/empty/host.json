@@ -2,5 +2,6 @@
   "name": "empty",
   "framework": "none",
   "entry": "src/main.js",
-  "html": "index.html"
+  "html": "index.html",
+  "notes": "Isolated cost C_iso (doc 07 §9): nothing runs except the injection block."
 }

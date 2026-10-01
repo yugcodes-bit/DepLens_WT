@@ -1,0 +1,1 @@
+{ "name": "react", "framework": "react", "entry": "src/main.jsx", "html": "index.html" }

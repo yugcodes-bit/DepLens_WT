@@ -255,7 +255,8 @@ deplens/
 │  ├─ bundler-kit/               # injector, esbuild/Vite builds, metafile diff, compression
 │  ├─ features/                  # AST + bundle + metadata feature extractors
 │  ├─ harness/                   # measurement harness: session runner, trace parser, stats
-│  └─ lockfile/                  # npm/pnpm/yarn lockfile → dependency graph
+│  ├─ lockfile/                  # npm/pnpm/yarn lockfile → dependency graph
+│  └─ db/                        # PostgreSQL schema (Drizzle) + migrations — §6
 ├─ research/
 │  ├─ hosts/                     # host apps (each: Vite app + inject marker + app-ready mark)
 │  ├─ corpus/                    # corpus builder + seed lists + curated import specs
@@ -309,6 +310,15 @@ erDiagram
 ```
 
 `SESSION.kind` ∈ {`ab`, `aa`, `iso`} (paired treatment, A/A noise, isolated-on-empty-page).
+
+**Implemented in `packages/db` (P1).** The Drizzle schema adds, beyond the ERD above:
+`SESSION.cell_key` (unique per machine — the resume key that stops a restarted campaign from
+re-measuring, FR-51), the exact byte deltas and new/shared package lists on `SESSION` (so the B3
+baseline needs no joins), `LABEL.within_noise` and `LABEL.baseline_median`, `BUILD.build_key` +
+`resolved_deps` + `package_bytes`, `MACHINE.calibration` as the whole rate→ms curve, and
+`PREDICTION.verified_session_id` linking a prediction to the session that verified it.
+The harness itself does **not** depend on this package: it must be able to measure with nothing but a
+disk (`packages/harness/src/store.ts`), and the campaign runner promotes stored sessions into Postgres.
 
 ## 7. Deployment
 

@@ -34,6 +34,22 @@ With 3 people, merge Analysis into Measurement + Web.
 - Postgres schema (Drizzle) for packages/hosts/sessions/runs/labels.
 - **Exit:** all hosts build deterministically; A/A 95% CI covers 0 in ≥ 90% of sessions; one 10-pair session ≤ 90 s on small hosts.
 
+**Status 1 Oct 2026** (details in `docs/research-log.md`):
+| P1 item | State |
+|---|---|
+| Vite builder + `deplens-stats` plugin | ✅ `packages/harness/src/viteBuild.ts`, `bundleStats.ts`; both bundlers share one `BuildResult` |
+| Host apps — 8 (`empty`, `vanilla`, `react`, `vue`, `svelte`, `preact`, `solid`, `react-heavy`) | ✅ all pass the contract check and build deterministically |
+| Host apps — 2 realistic OSS hosts (Conduit-style) | ⏳ not started; the only P1 item left on hosts (risk R5) |
+| Profiles from a measured calibration curve | ✅ `profiles.ts` + `machine.ts`; rate is interpolated per machine |
+| Calibration & drift abort (FR-33) | ✅ verified in anger — refused a session that started 108% slow |
+| Invalid-cell detection (FR-34) | ✅ `checkValidity`: zero-byte delta, package absent, lazy not split |
+| Trace storage + session metadata (FR-35) | ✅ `--traces`; sessions stored as JSON + append-only index (resume key per cell) |
+| Postgres schema (Drizzle) | ✅ `packages/db` — 14 tables from doc 06 §6, migration generated |
+| Unit tests | ✅ 47 passing (was 15) |
+| **Exit: deterministic builds** | ✅ 8/8 hosts |
+| **Exit: 10-pair session ≤ 90 s** | ✅ 38–40 s on small hosts |
+| **Exit: A/A CI covers 0 in ≥ 90% of sessions** | ❌ **blocked** — needs ≥ 10 A/A sessions per host on a quiet machine. Early signal is good: 3/3 A/A sessions cover 0 with MDE₉₅ ≈ 1.3 ms when the dev laptop is idle, but it is unusable under load |
+
 ### P2 — Pilot study (RQ1/RQ2 go/no-go) · Week 4 (20 – 26 Oct)
 - 40 packages (≥ 6 alternative groups) × 2 scenarios × 4 hosts × 1 profile ≈ 250–320 cells + isolated sessions.
 - Analyses: size proxies vs ΔScript (RQ2); context effect ΔC − C_iso incl. a React component lib in React vs vanilla hosts (RQ1); noise per host.

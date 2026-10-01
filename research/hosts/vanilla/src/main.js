@@ -5,18 +5,14 @@
 globalThis.__DL_SINK__ = [];
 /* @deplens-end */
 
-const orders = Array.from({ length: 40 }, (_, i) => ({
-  id: 1000 + i,
-  customer: `Customer ${i + 1}`,
-  total: ((i * 37) % 500) + 0.99,
-}));
+import { orders } from './data.js';
 
 function render() {
   const list = document.getElementById('list');
   const frag = document.createDocumentFragment();
   for (const o of orders) {
     const li = document.createElement('li');
-    li.textContent = `#${o.id} · ${o.customer} · $${o.total.toFixed(2)}`;
+    li.textContent = `#${o.id} · ${o.customer} · $${o.total.toFixed(2)} · ${o.status}`;
     frag.appendChild(li);
   }
   list.appendChild(frag);

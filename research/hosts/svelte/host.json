@@ -1,0 +1,1 @@
+{ "name": "svelte", "framework": "svelte", "entry": "src/main.js", "html": "index.html" }

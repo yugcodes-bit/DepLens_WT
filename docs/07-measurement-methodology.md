@@ -43,6 +43,17 @@ globalThis.__DL_SINK__ = [format, parseISO];
 ### 2.3 Build
 - Host apps are built with **their own Vite config** in production mode, with a small `deplens-stats` plugin that writes chunk → modules → rendered length.
 - Pinned toolchain per dataset release (Node, Vite, esbuild versions recorded in the session).
+- The harness adds four inline settings to every host build (P1, see research log 2026-10-01):
+  `base: './'` (relative asset URLs — A and B are served under path prefixes on one origin, §3.5),
+  `mode: 'production'` with **NODE_ENV left unset** (an inherited NODE_ENV overrides the mode and
+  silently produces a development build: larger and non-deterministic), `sourcemap: false`, and
+  `reportCompressedSize: false` — we compress ourselves at fixed gzip-9 / brotli-11 so byte deltas
+  are comparable across hosts and releases.
+- **Each build runs in its own process.** On Windows a work dir whose rollup/esbuild native binaries
+  have been loaded cannot be deleted until the loading process exits, so an in-process campaign would
+  leave one `node_modules` per cell behind. `harness build --json` is the single-build entry point.
+- Host apps keep their build toolchain in `devDependencies`, as a real app does; the installer passes
+  `--include=dev` explicitly because npm omits dev dependencies when NODE_ENV=production.
 - Sanity checks (FR-34): treatment Δbytes > 0 (unless the package is genuinely empty after tree-shaking — then label as "zero-cost", do not measure); the package appears in the stats; the build is deterministic (same hash on rebuild).
 
 ## 3. Measurement environment
@@ -66,6 +77,23 @@ Lighthouse's docs note that CPU throttling is expressed **relative to the host**
 | mid-tier-mobile *(default)* | slowdown chosen so the calibration benchmark takes ≈ 4× reference (Lighthouse's default desktop→mid-tier-mobile ratio) | "Slow 4G": 1.6 Mbps down, 150 ms RTT (Lighthouse mobile default) |
 | low-end-mobile | ≈ 10× reference (subset only) | 0.4 Mbps, 400 ms RTT |
 
+**Worked example (first dev machine, i7-11800H, Chromium 141, measured 2026-10-01).** The same machine,
+measured twice — median of 3 sweeps each, `pnpm harness calibrate --repeats 3`:
+
+| state | machine index | rate 1 | 2 | 3 | 4 | 6 | sweep spread | slowdown at rate 4 | `mid-tier-mobile` resolves to |
+|---|---|---|---|---|---|---|---|---|---|
+| loaded | 58,928 | 20.8 ms | 57.4 | 101.8 | 174.7 | 314.2 | 14–52% | 8.4× | rate 2.58 |
+| **idle** | 105,320 | 11.3 ms | 23.9 | 37.6 | 48.4 | 83.6 | 4–11% | 4.28× | rate 3.70 |
+
+Two lessons. (1) **Calibrate idle.** Under load the higher rates suffer disproportionately, so a
+reference taken on a busy machine overstates the slowdown and mis-resolves every profile. (2) The rate
+still has to be **interpolated from each machine's own curve** (`resolveCpuRate`), never hard-coded:
+even idle, rate 4 is 4.28× here and ≈ 4.8× on the Phase 0 cloud container.
+
+A machine qualifies for dataset cells only if its rate-1 calibration is **stable to within a few
+percent across sweeps** (target ≤ 5%). Record the machine index with every session — it is the cheapest
+way to notice a reference captured in the wrong state (research log 2026-10-01).
+
 If you have **one real Android phone**, measure the calibration benchmark on it (Chrome via USB remote debugging) to anchor a "this phone" profile — a strong credibility boost in the paper (optional, doc 09).
 
 ### 3.4 Browser setup
@@ -76,6 +104,9 @@ If you have **one real Android phone**, measure the calibration benchmark on it 
 
 ### 3.5 Serving
 - `dist/` served from a local static server (HTTP/1.1, no compression needed for CPU runs), same port, same headers for A and B. `Cache-Control: no-store`.
+- Baseline and treatment are mounted under path prefixes (`/a`, `/b`) of that one origin, which is why
+  host builds must use `base: './'` (§2.3). A fresh browser context per run keeps the HTTP cache cold,
+  so sharing an origin does not leak a V8 code cache between arms.
 
 ## 4. Per-run measurement
 
@@ -175,7 +206,9 @@ Node-only (uses `fs`, `child_process`, native addons); CLI tools; type-only pack
    ⚠️ Do **not** implement fixtures as `performance.now()` busy-waits: under CPU throttling the wall clock keeps running, so a "busy-wait N ms" does the *same* wall time at every slowdown and hides throttling.
 2. **A/A null test:** 95% CIs of A/A sessions cover 0 in ≈ 95% of sessions.
 3. **Golden traces:** 3 saved traces with hand-verified bucket sums — parser regression tests.
-4. **Determinism of builds:** rebuild each host 3× → identical hashes.
+4. **Determinism of builds:** rebuild each host 3× → identical hashes. Implemented as
+   `pnpm harness hosts --determinism` (each build in a separate process and work root).
+   ✅ **All 8 hosts pass as of 2026-10-01.**
 5. **Throttling behaviour:** §4.7.
 
 ## 9. Isolated measurement (for RQ1 and the hybrid model)

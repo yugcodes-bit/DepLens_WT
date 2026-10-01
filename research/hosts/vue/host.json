@@ -1,0 +1,1 @@
+{ "name": "vue", "framework": "vue", "entry": "src/main.js", "html": "index.html" }

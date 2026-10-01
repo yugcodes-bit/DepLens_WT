@@ -1,0 +1,1 @@
+{ "name": "preact", "framework": "preact", "entry": "src/main.jsx", "html": "index.html" }

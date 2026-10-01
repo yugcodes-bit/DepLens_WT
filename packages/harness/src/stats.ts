@@ -27,6 +27,11 @@ export function median(values: readonly number[]): number {
   return s.length % 2 === 1 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
 }
 
+export function mean(values: readonly number[]): number {
+  if (values.length === 0) return Number.NaN;
+  return values.reduce((s, v) => s + v, 0) / values.length;
+}
+
 export function quantile(values: readonly number[], q: number): number {
   if (values.length === 0) return Number.NaN;
   const s = [...values].sort((x, y) => x - y);
@@ -100,4 +105,19 @@ export function linearFit(xs: readonly number[], ys: readonly number[]): { inter
   const intercept = my - slope * mx;
   const r2 = syy === 0 ? 1 : (sxy * sxy) / (sxx * syy);
   return { intercept, slope, r2 };
+}
+
+/**
+ * Minimum detectable effect from A/A sessions (doc 07 §7): the 95th percentile of the absolute
+ * A/A estimates. Labels smaller than this are "within noise" — they are kept (a negligible cost is
+ * real information) but reported separately from material ones.
+ */
+export function mdeFromAA(aaEstimates: readonly number[], level = 0.95): number {
+  return quantile(aaEstimates.map(Math.abs), level);
+}
+
+/** Share of A/A sessions whose CI contains 0 — should be ≈ the nominal level (doc 07 §8.2). */
+export function aaCoverage(cis: readonly { ciLow: number; ciHigh: number }[]): number {
+  if (cis.length === 0) return Number.NaN;
+  return cis.filter((c) => c.ciLow <= 0 && c.ciHigh >= 0).length / cis.length;
 }

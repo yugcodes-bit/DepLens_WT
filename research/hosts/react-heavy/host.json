@@ -1,0 +1,7 @@
+{
+  "name": "react-heavy",
+  "framework": "react",
+  "entry": "src/main.jsx",
+  "html": "index.html",
+  "notes": "Synthetic heavy baseline (doc 07 §5): router + state lib + UI kit + date lib, so shared-dependency dedup and TBT task merging have something to act on."
+}
