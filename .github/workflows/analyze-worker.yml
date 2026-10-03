@@ -1,0 +1,75 @@
+# Tier-2 analysis worker (doc 06 §7.2).
+#
+# This runs the byte-analysis pipeline on a GitHub Actions runner. That is allowed — and is the
+# documented design — because this worker produces **no timing numbers**. Hard rule 1 bans
+# measurement on shared machines because *timing* is sensitive to machine load (A/A noise reaches
+# ±4 ms on a loaded machine versus ±0.3 ms idle, docs/research-log.md 2026-10-01). Byte counts come
+# from deterministic bundler output and reproduce identically on a busy runner.
+#
+# Timing stays on the quiet machine, which polls the 'measurement' tier instead.
+name: analysis worker
+
+on:
+  # Drain the queue on a schedule; free minutes are unlimited on a public repository.
+  schedule:
+    - cron: '*/15 * * * *'
+  # ...and on demand, so a queued analysis does not wait for the next slot.
+  workflow_dispatch:
+    inputs:
+      max_jobs:
+        description: 'Maximum jobs to process in this run'
+        required: false
+        default: '10'
+
+concurrency:
+  # One worker at a time. The queue claim is atomic (FOR UPDATE SKIP LOCKED), so overlapping runs
+  # would be safe — but they would also compete for npm cache and disk for no benefit.
+  group: analysis-worker
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    # An analysis installs packages and runs two bundlers per candidate; this bounds a stuck run.
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install workspace dependencies
+        # The workspace's own install. Candidate packages are installed later by the worker itself,
+        # always with --ignore-scripts (hard rule 2).
+        run: pnpm install --frozen-lockfile
+
+      - name: Check the feature schema contract
+        # Cheap, and it fails fast if someone edited feature-schema.json without regenerating the
+        # snapshot — which would otherwise produce rows whose columns do not line up (doc 09 P3).
+        run: pnpm --filter @deplens/features test
+
+      - name: Verify host apps build deterministically
+        # doc 07 §8.4. A host that stopped building reproducibly makes every Δbytes from it suspect,
+        # so the worker must not run against one.
+        run: pnpm harness hosts
+
+      - name: Drain the analysis queue
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Never set DEPLENS_E2E here: it would expose CAPTCHA answers. It is ignored when
+          # NODE_ENV=production, but the right place to not set it is everywhere.
+          NODE_ENV: production
+        run: pnpm worker --max ${{ github.event.inputs.max_jobs || '10' }}
+
+      - name: Prune cached node_modules
+        # The work dir fills up fast; on a runner it is thrown away anyway, but this keeps the step
+        # honest about what a long-lived worker has to do (CLAUDE.md: run `harness clean` after a
+        # campaign).
+        if: always()
+        run: pnpm harness clean

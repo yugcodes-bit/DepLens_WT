@@ -10,8 +10,11 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "@deplens/bundler-kit": "workspace:*",
     "esbuild": "^0.25.0",
-    "playwright-core": "1.56.1"
+    "playwright-core": "1.56.1",
+    "@deplens/shared": "workspace:*",
+    "@deplens/analyzer": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

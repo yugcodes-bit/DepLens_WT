@@ -1,0 +1,25 @@
+{
+  "name": "@deplens/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared contracts: provenance, device profiles, risk rules and the Zod schemas the API and the UI both validate against (doc 06 §5).",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@deplens/feature-schema": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./profiles": "./src/profiles.ts"
+  }
+}

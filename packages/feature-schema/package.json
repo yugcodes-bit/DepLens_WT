@@ -3,5 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "description": "feature-schema.json — single source of truth for feature names/types, read by TS extractors and the Python ML pipeline",
-  "main": "feature-schema.json"
+  "main": "feature-schema.json",
+  "exports": {
+    "./feature-schema.json": "./feature-schema.json",
+    "./contract.json": "./contract.json",
+    "./contract.ts": "./contract.ts"
+  },
+  "scripts": {
+    "contract": "tsx contract.ts",
+    "test": "echo \"(no unit tests in this package)\""
+  }
 }

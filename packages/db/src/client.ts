@@ -48,10 +48,12 @@ export function getDb(): DepLensDb {
   const url = databaseUrl();
   pool = new Pool({
     connectionString: url,
-    // The local PGlite socket server wraps a single WASM Postgres and serves one connection at a
-    // time — a larger pool gets ECONNRESET on the extra clients. Neon's pooled endpoint plus
-    // serverless functions means many short-lived clients, so keep that small too.
-    max: Number(process.env.DEPLENS_DB_POOL ?? (isLocalPglite(url) ? 1 : 5)),
+    // The local PGlite socket server wraps a single WASM Postgres. It accepts several connections
+    // and queues at the query level, but every query still runs on one engine, so a big pool buys
+    // nothing and a pool larger than the server's `maxConnections` gets ECONNRESET on the extras.
+    // Neon's pooled endpoint plus serverless functions means many short-lived clients, so that is
+    // kept small too.
+    max: Number(process.env.DEPLENS_DB_POOL ?? (isLocalPglite(url) ? 2 : 5)),
     ...(url.includes('neon.tech') ? { ssl: { rejectUnauthorized: true } } : {}),
   });
   db = drizzle(pool, { schema });

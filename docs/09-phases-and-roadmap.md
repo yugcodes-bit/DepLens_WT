@@ -58,11 +58,31 @@ With 3 people, merge Analysis into Measurement + Web.
   - If context effect is negligible everywhere → drop "context-aware" from the headline, keep import-aware runtime prediction.
   - Otherwise → proceed as planned.
 
-### P3 — Static analyzer & features · Weeks 3–5 (13 Oct – 2 Nov), parallel with P1/P2
-- `packages/lockfile` (npm v3, pnpm, yarn) → dependency graph.
-- `packages/bundler-kit`: isolated esbuild builds, Vite host builds with `deplens-stats` plugin, metafile diff, gzip/brotli, added-code extraction.
-- `packages/features`: G1–G5 extractors from `feature-schema.json`; unit tests with fixtures.
-- **Exit:** features for all pilot cells; extractor ≤ 5 s per cell (excluding install); schema contract test TS ↔ Python passes.
+### P3 — Static analyzer & features · **done 3 Oct 2026** (ahead of its Weeks 3–5 slot)
+- `packages/lockfile` (npm v1–v3, pnpm 5/6/9, yarn classic + berry) → one flat dependency graph.
+- `packages/bundler-kit`: isolated esbuild builds, Vite host builds with the `deplens-stats` plugin,
+  metafile diff, gzip/brotli, added-code extraction. `build.ts` / `viteBuild.ts` / `inject.ts` /
+  `importSpec.ts` / `bundleStats.ts` moved here from the harness with re-export shims.
+- `packages/features`: G1–G5 + G7 extractors driven by `feature-schema.json`.
+- `packages/shared`: provenance, the profile catalogue, FR-24 risk rules, the explanation
+  templates, the shared Zod schemas. `packages/analyzer`: the pipeline + the B3 placeholder.
+
+**Status 3 Oct 2026 — all three exit criteria met:**
+| P3 item | State |
+|---|---|
+| `packages/lockfile`, all four formats agreeing on one graph | ✅ 48 tests |
+| `packages/bundler-kit`, isolated + namespace + unminified-delta builds | ✅ 41 tests |
+| `packages/features`, G1–G5 + G7 of the 83-feature schema | ✅ 100 tests |
+| `packages/shared`, risk rules covering all four classes (FR-24) | ✅ 44 tests |
+| `packages/analyzer`, pipeline + ranking that marks ties (UC-02) | ✅ 24 tests |
+| **Exit: features for all pilot cells** | ✅ 78 features (83 − 5 measured G6) on 5 hosts × 6 packages |
+| **Exit: extractor ≤ 5 s per cell** | ✅ **43–359 ms** measured |
+| **Exit: schema contract TS ↔ Python** | ✅ both sides assert the same SHA-256 digest against a committed `contract.json` |
+
+- **The context effect, produced by the pipeline:** `import { format } from 'date-fns'` costs
+  **19,918 B** on `react` and **204 B** on `react-heavy` — 98×, byte-identical source.
+- **Finding:** the bytes-only placeholder's intervals overlap for every pair in the four-way date
+  comparison, so it declines to rank them. Correct behaviour, and the sharpest argument for P4.
 
 ### P4 — Corpus & full data collection · Weeks 5–9 (27 Oct – 30 Nov), background
 - Corpus builder with inclusion/exclusion reasons; curated typical imports (LLM-assisted drafting is fine, **human-verified**); alternative groups.
@@ -100,8 +120,12 @@ suite, audit log, responsive layouts at 360/768/1366/1920 px, and a free-tier de
 | Project intake (Quick mode: manifest hash + framework detection) | ✅ FR-01, FR-03 |
 | **Tests** | ✅ 51 page/API test cases pass (`pnpm test:web`); bundle budget PASS (`pnpm --filter @deplens/web test:budget`) |
 | **NFR-P5 — our own JS budget** | ✅ heaviest route 102.1 KB brotli of a 150 KB budget |
-| Analysis UI (results cards, compare view, forest plot), Verify flow | ⏳ next, once P3 can produce features |
-| GitHub Actions byte-analysis worker | ⏳ workflow lands with P3 |
+| Analysis UI: new-analysis form, results cards with provenance badges, forest plot, feature inspector | ✅ 3 Oct 2026 |
+| Analysis API + Postgres job queue + tier-2 worker | ✅ 3 Oct 2026, 34 e2e test cases |
+| GitHub Actions byte-analysis worker | ✅ `.github/workflows/analyze-worker.yml` |
+| CI workflow (TS + Python + web, no measurement) | ✅ `.github/workflows/ci.yml` |
+| Verify flow (needs a measurement machine) | ⏳ P7 |
+| Project-bound analyses (the `analysis`/`prediction` tables are still unused) | ⏳ |
 | Account deletion / data export (FR-73) | ⏳ |
 
 - API (Fastify, Zod, OpenAPI), BullMQ queues, analyzer worker, SSE progress.
@@ -109,10 +133,30 @@ suite, audit log, responsive layouts at 360/768/1366/1920 px, and a free-tier de
 - Sandbox container for untrusted installs/builds.
 - **Exit:** end-to-end analysis on 3 fixture projects; malicious-postinstall test passes; NFR-P1/P2 measured.
 
-### P6 — ML pipeline · Weeks 8–11 (17 Nov – 14 Dec)
+### P6 — ML pipeline · Weeks 8–11 (17 Nov – 14 Dec) · **code done 3 Oct 2026, results blocked on P4**
 - Dataset loader, transforms, baselines B0–B4, M1/M2, Optuna nested grouped CV, conformal intervals, TreeSHAP, ablations, statistics.
 - FastAPI ML service + model registry; swap the placeholder predictor.
 - **Exit:** full S2/S3/S4 results table with CIs and Wilcoxon/Holm tests; interval coverage within ±5 pts; model card generated.
+
+**Status 3 Oct 2026 — the pipeline runs; it has nothing real to run on.**
+| P6 item | State |
+|---|---|
+| Dataset loader + validation against the feature schema | ✅ |
+| Splits S1–S4 with per-fold leakage assertions (hard rule 3) | ✅ |
+| `assert_headline_eligible` refusing to report S1 (hard rule 4) | ✅ |
+| Baselines B0–B4, isotonic-fitted so each gets its best form (hard rule 5) | ✅ |
+| asinh target transform (the label can be ≤ 0) | ✅ |
+| LightGBM with monotone constraints read from the schema | ✅ |
+| Split-conformal intervals with the finite-sample correction | ✅ |
+| Evaluation script writing a timestamped results table | ✅ `pnpm ml:eval` |
+| Synthetic generator + `assert_real()` gate | ✅ 60 Python tests |
+| **Real S2/S3/S4 results, statistics, TreeSHAP, model card** | ⛔ **needs the P4 dataset** |
+| Optuna nested CV, M2 (XGBoost), FastAPI service | ⏳ |
+
+- **Known issue found on synthetic data:** split-conformal under-covered on S2 (0.78 vs a nominal
+  0.90) while S1/S3/S4 were within tolerance. Plain split-conformal assumes exchangeability that a
+  grouped split breaks; P6 should use group-aware (Mondrian) conformal. Doc 08 §8's ±5 pt criterion
+  is what caught it.
 
 ### P7 — Product features & integration · Weeks 10–12 (1 – 21 Dec)
 - Verify flow (measurer worker, concurrency 1) + measured-vs-predicted view.

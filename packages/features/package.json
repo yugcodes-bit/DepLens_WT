@@ -1,0 +1,23 @@
+{
+  "name": "@deplens/features",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Feature extractors for groups G1-G5 of doc 08 §3, emitting only names declared in feature-schema.json.",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@deplens/bundler-kit": "workspace:*",
+    "@deplens/feature-schema": "workspace:*",
+    "@deplens/lockfile": "workspace:*",
+    "acorn": "^8.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

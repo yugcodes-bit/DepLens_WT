@@ -23,7 +23,14 @@ const host = process.env.DEPLENS_PG_HOST ?? '127.0.0.1';
 
 await mkdir(PGLITE_DIR, { recursive: true });
 const pglite = await PGlite.create(PGLITE_DIR);
-const server = new PGLiteSocketServer({ db: pglite, port, host });
+/**
+ * More than one connection, so the web app and the tier-2 worker can both be running (doc 06 §7.3):
+ * the worker claims jobs from the same database the app writes them to, and with a single
+ * connection the second process just gets `ECONNRESET`. `PGLiteSocketServer` queues at the *query*
+ * level, so concurrent clients are safe — one WASM Postgres still executes them one at a time.
+ */
+const maxConnections = Number(process.env.DEPLENS_PG_MAX_CONNECTIONS ?? 10);
+const server = new PGLiteSocketServer({ db: pglite, port, host, maxConnections });
 await server.start();
 
 console.log(`PGlite listening on postgres://postgres@${host}:${port}/postgres`);

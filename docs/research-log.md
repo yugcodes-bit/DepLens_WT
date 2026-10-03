@@ -105,3 +105,42 @@ Record every decision that affects labels, features, splits or claims. Newest en
 4. **`DEPLENS_E2E=1`** exposes the CAPTCHA answer from `/api/captcha` so the test script can submit forms. It is gated on `NODE_ENV !== 'production'` **and** the flag, and there is deliberately **no bypass inside `verifyCaptcha`** — the checking path is identical in every environment.
 **Validation:** 51 page/API test cases pass end to end against a real Postgres (`apps/web/test/e2e-auth.mjs`), covering validation of all six validator kinds, CAPTCHA enforcement, OTP issue/verify/replay, session grant and revocation, CSRF with and without token and from a foreign origin, account lockout after 5 failures, and reset-token single use. The app passes its own performance budget: heaviest route **102.1 KB brotli** against the 150 KB NFR-P5 limit, measured with the same brotli-11 setting the harness uses for Δbytes (`apps/web/test/bundle-budget.mjs`).
 **Consequences:** `packages/db` gains `user`, `auth_session`, `otp_code`, `password_reset`, `audit_log` and `job`; `project` gains an owner. `docs/13-deployment-guide.md` documents the free-tier deployment. The analysis/compare UI and the GitHub Actions worker wait on P3's feature extraction.
+
+## 2026-10-03 — Phase 3 complete: the analyzer is split out, and the placeholder's intervals make the case for the dataset
+**Context:** P3 (static analyzer & features) was the last phase that did not need a measurement machine. Doc 06 §5 specifies `bundler-kit` / `features` / `lockfile` / `shared` as separate packages, and doc 09's P3 exit criteria are features for all pilot cells, extraction under 5 s per cell, and a TS ↔ Python schema contract test.
+
+**What was built:** four new packages plus an analysis pipeline and the ML pipeline skeleton.
+- `packages/lockfile` — npm v1/v2/v3, pnpm 5/6/9, yarn classic and berry into one flat dependency graph (48 tests). All four formats are held to the *same* assertions on the same project, which is what caught two real bugs: pnpm's `(peer@x)` resolution suffix being read as part of the version, and yarn's lack of any dev/runtime marker. `dev` is now derived from reachability for every format, so the field means one thing.
+- `packages/bundler-kit` — injection, isolated builds, metafile diff, exact byte sizing (41 tests). `build.ts`, `viteBuild.ts`, `inject.ts`, `importSpec.ts` and `bundleStats.ts` **moved here from the harness**, with re-export shims so no internal import path changed; the harness's own tests passing unchanged is the evidence the move was behaviour-preserving.
+- `packages/features` — all of G1–G5 and G7, 100 tests.
+- `packages/shared` — provenance, the profile catalogue (moved from the harness so the web app does not depend on Playwright), the FR-24 risk rules, the explanation templates, and the Zod schemas the API and UI share (44 tests).
+- `packages/analyzer` + `services/analyzer` — the pipeline and the tier-2 worker; `ml/` — splits, baselines, metrics, conformal intervals, LightGBM (60 Python tests).
+
+**Exit criteria, measured:**
+1. *Features for all pilot cells.* 78 features (G1+G2+G3+G4+G5+G7 — the 83-feature schema minus the 5 measured G6 features) produced on 5 hosts × 6 packages.
+2. *Extraction ≤ 5 s per cell.* Measured **43–359 ms**, two orders of magnitude inside the budget.
+3. *Schema contract TS ↔ Python.* Both sides derive the contract from `feature-schema.json` independently and assert the same SHA-256 digest over (name, group, type) against a committed `contract.json`. A one-sided schema edit now fails a test rather than silently misaligning dataset columns.
+
+**Evidence — the context effect, now produced by the pipeline rather than by hand.** `import { format } from 'date-fns'`:
+
+| host | Δmin bytes | shared with app | ΔScript (predicted) |
+|---|---|---|---|
+| `react` (222,183 B baseline) | **19,918** | — | 9.5 ms [0.5, 23.7] |
+| `react-heavy` (411,384 B baseline) | **204** | date-fns | 0.1 ms [0.0, 0.2] |
+
+98× for byte-identical source, with `ctx_shared_bytes_saved` and a duplicate-version warning both firing correctly (react-heavy pins a different date-fns, so the copies ship together).
+
+**Finding — the bytes-only placeholder cannot rank, and says so.** The doc 05 UC-02 comparison (moment / dayjs / date-fns / luxon on `react`, 50 ms budget) returned exact byte deltas of 61,626 / 7,470 / 19,918 / 70,280 B and ranked dayjs first — but marked **every** adjacent pair "no clear difference", because the B3 placeholder's intervals (±0.05×/2.5× of the point estimate) all overlap. moment and luxon came back `UNCERTAIN — verify recommended`. This is the correct behaviour for a predictor that only knows bytes, and it is the sharpest available argument for the measured dataset: the interval width *is* the finding. It also validates the FR-24 rule that risk comes from the interval rather than the point estimate.
+
+**Finding — split-conformal under-covers on a grouped split.** On synthetic data the intervals covered 0.931 / 0.783 / 0.908 / 0.956 against a nominal 0.90 on S1/S2/S3/S4. S2 (unseen package) is the headline split and the one that misses, which is expected in hindsight: plain split-conformal assumes the calibration rows are exchangeable with the test rows, and a grouped split breaks exactly that. **P6 must use group-aware (Mondrian) conformal**, calibrating within package groups. Doc 08 §8's ±5 pt coverage criterion is what surfaced it, on synthetic data, before any real number was reported.
+
+**Decisions:**
+1. **The B3 placeholder announces itself.** `kind: 'b3-bytes-linear'`, `trainedOnCells: null`, and a note saying it is not a trained model. Its coefficient (0.122 ms/KB per unit slowdown) is derived from the one in-context measurement in this log (lodash on `react`, 73,468 B → 37.4 ms at 4.28×) and reproduces it to within a decimal place. One data point is a scale, not a model, which is why the interval is ±0.05×/2.5×.
+2. **LightGBM uses the Huber objective, not L1.** LightGBM refuses `monotone_constraints` with `regression_l1`. Both are robust to the heavy tail; given the choice the constraints matter more, because without them the model may learn that more added bytes means less time, which would make the explanation list indefensible even where the point estimate was good.
+3. **Tier 2 runs on GitHub Actions, enforced by what the code can do.** `@deplens/analyzer` and the worker import no browser package, so the no-timing tier is a property of the dependency graph rather than a promise in a comment.
+4. **Synthetic data is gated, not trusted.** `ml/deplens_ml/dataset.py` stamps every synthetic frame and `assert_real()` raises if one reaches a reporting path; `--synthetic` output is written to `reports/synthetic/`. The S1 random-row split is evaluated but printed under `[DIAGNOSTIC ONLY, NOT A RESULT]`, and `assert_headline_eligible` raises if it is used as one (hard rules 3 and 4, enforced in code).
+5. **G4 is extracted from the *unminified* added code, with packages the host already ships marked external.** That makes "added code" mean what doc 08 §3 says it means: a candidate whose dependencies the app already has has little genuinely added code, and its G4 features collapse accordingly — while the G2 byte features still describe the candidate as a whole.
+
+**Correction to a note in CLAUDE.md:** the local PGlite socket server is *not* limited to one connection in the installed version — `PGLiteSocketServer` takes `maxConnections` and queues at the query level. It was defaulting to 1, which is why the web app and the worker could not both run (`read ECONNRESET`). Now set to 10, with the app's pool at 2.
+
+**Consequences:** `pnpm test` runs all packages (288 TS unit tests); `pnpm test:ml` runs 60 Python tests; `pnpm analyze` and `pnpm worker` are new entry points; `STATUS.md` is the single project tracker and `docs/14-demo-runbook.md` the demo script. Two GitHub Actions workflows added (`ci.yml`, `analyze-worker.yml`), neither of which measures timing. P2/P4/P6-results/P7/P8 remain blocked on a quiet machine — and nothing in the software is now waiting on software.

@@ -1,0 +1,23 @@
+{
+  "name": "@deplens/analyzer-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tier-2 analysis worker: claims analyze jobs from Postgres and runs the static pipeline. No timing, no browser (doc 06 §7.2).",
+  "scripts": {
+    "start": "tsx worker.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "jobs": "tsx jobs.ts"
+  },
+  "dependencies": {
+    "@deplens/analyzer": "workspace:*",
+    "@deplens/db": "workspace:*",
+    "@deplens/shared": "workspace:*",
+    "drizzle-orm": "^0.44.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

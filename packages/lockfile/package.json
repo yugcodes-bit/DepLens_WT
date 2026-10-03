@@ -1,0 +1,20 @@
+{
+  "name": "@deplens/lockfile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lockfile parsing (npm v1-v3, pnpm, yarn classic + berry) into one dependency graph — doc 06 §5, FR-02.",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

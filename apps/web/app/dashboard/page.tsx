@@ -37,6 +37,18 @@ export default async function DashboardPage() {
         </p>
       </section>
 
+      <section className="dl-card flex flex-col items-start gap-3 p-6">
+        <h2 className="text-lg font-bold tracking-tight">Compare candidate packages</h2>
+        <p className="max-w-prose text-sm text-[var(--color-ink-soft)]">
+          Pick one of the research host apps, list the packages you are choosing between, and see what each
+          one would add — exact bytes, a predicted main-thread cost with an uncertainty interval, and the
+          reasons behind both.
+        </p>
+        <Link href="/analyze" className="dl-btn dl-btn-primary text-sm">
+          New analysis
+        </Link>
+      </section>
+
       <section className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold tracking-tight">Your projects</h2>

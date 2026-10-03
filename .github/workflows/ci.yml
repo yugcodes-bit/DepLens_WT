@@ -1,0 +1,128 @@
+# Continuous integration: unit tests, typecheck, and the TS ↔ Python schema contract.
+#
+# Deliberately does **not** run a measurement session. Hard rule 1: timing on a shared CI runner is
+# not valid data. The harness's unit tests run here (they are pure functions and golden traces); the
+# measurement campaign runs on the quiet machine.
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+      - name: Generate the synthetic calibration fixtures
+        # The bundler-kit integration tests install from these with `file:` specifiers, so they need
+        # no registry access.
+        run: pnpm fixtures
+
+      - run: pnpm test
+
+      - name: Host app contracts
+        # Marker, app-ready mark and determinism inputs (doc 07 §8).
+        run: pnpm harness hosts
+
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install the ML environment
+        working-directory: ml
+        run: uv sync
+
+      - name: Schema contract (the Python half) and pipeline tests
+        # The TS half runs in the `typescript` job. Both compare to the same committed contract.json,
+        # so a one-sided schema edit fails here (doc 09 P3 exit criterion).
+        working-directory: ml
+        run: uv run pytest -q
+
+      - name: Lint
+        working-directory: ml
+        run: uv run ruff check .
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start the local Postgres (PGlite behind a socket)
+        run: |
+          pnpm db:serve &
+          # Wait for the port rather than sleeping a fixed time.
+          for i in $(seq 1 60); do
+            if nc -z 127.0.0.1 5432; then echo "postgres up"; break; fi
+            sleep 1
+          done
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+        run: pnpm db:migrate
+
+      - name: Start the app in E2E mode
+        env:
+          DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          AUTH_SECRET: ci-only-secret-not-used-anywhere-else
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3111
+          # Exposes the CAPTCHA answer so the test script can submit forms. Ignored when
+          # NODE_ENV=production, and never set on a deployment.
+          DEPLENS_E2E: '1'
+        run: |
+          pnpm --filter @deplens/web dev -p 3111 &
+          for i in $(seq 1 90); do
+            if curl -sf http://127.0.0.1:3111/ > /dev/null; then echo "web up"; break; fi
+            sleep 1
+          done
+          # Warm the routes: Next dev compiles each one on first request, which would otherwise
+          # time out the first test that touches it.
+          for p in / /login /register /verify /forgot /reset /dashboard /analyze /how-it-works; do
+            curl -sf -o /dev/null "http://127.0.0.1:3111$p" || true
+          done
+
+      - name: Auth and page tests
+        env:
+          DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+        run: node apps/web/test/e2e-auth.mjs http://127.0.0.1:3111
+
+      - name: Analysis API tests
+        env:
+          DATABASE_URL: postgres://postgres@127.0.0.1:5432/postgres
+          DEPLENS_E2E_BASE: http://127.0.0.1:3111
+        # Without --with-worker: the worker path installs npm packages and is covered by the
+        # analysis-worker workflow instead.
+        run: node apps/web/test/e2e-analysis.mjs
+
+      - name: JS budget per route (NFR-P5)
+        run: pnpm --filter @deplens/web test:budget

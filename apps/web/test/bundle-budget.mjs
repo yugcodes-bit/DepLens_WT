@@ -20,6 +20,26 @@ if (!existsSync(MANIFEST)) {
   process.exit(1);
 }
 
+/**
+ * Refuse to measure a development build.
+ *
+ * `next dev` writes the same manifest path as `next build`, and dev bundles are unminified and
+ * carry the whole HMR runtime — they came out around 1.3 MB per route against a 150 KB budget. That
+ * is not a budget failure, it is a measurement of the wrong thing, and reporting it as a failure
+ * would be worse than not running: it trains you to ignore the check.
+ */
+if (existsSync('.next/package.json')) {
+  // A dev server writes `.next/package.json` with {"type":"commonjs"}; a production build does not.
+  const devMarkers = ['.next/static/chunks/webpack.js', '.next/static/development'];
+  if (devMarkers.some((p) => existsSync(p))) {
+    console.error(
+      'The .next directory holds a *development* build, so this budget would be meaningless.\n' +
+        'Stop `next dev`, then run: pnpm --filter @deplens/web build && pnpm --filter @deplens/web test:budget',
+    );
+    process.exit(1);
+  }
+}
+
 const brotli = (path) =>
   brotliCompressSync(readFileSync(path), { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }).length;
 

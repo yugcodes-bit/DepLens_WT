@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deplensStats, initialFiles, type BundleStats } from '../src/bundleStats.ts';
-import { packageOfPath } from '../src/build.ts';
+import { packageOfPath } from '../src/metafile.ts';
 
 /**
  * A bundle shaped like a real Vite build: one entry chunk that statically imports a vendor chunk

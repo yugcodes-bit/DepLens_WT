@@ -1,0 +1,28 @@
+{
+  "name": "@deplens/bundler-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Import-spec injection, isolated esbuild builds, metafile diffing and exact byte sizing — the build half of the analyzer, with no browser dependency (doc 09 P3).",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./importSpec": "./src/importSpec.ts",
+    "./bundleStats": "./src/bundleStats.ts",
+    "./inject": "./src/inject.ts",
+    "./build": "./src/build.ts",
+    "./viteBuild": "./src/viteBuild.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

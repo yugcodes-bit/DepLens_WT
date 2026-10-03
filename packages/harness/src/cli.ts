@@ -19,7 +19,8 @@ import { InvalidCellError, measureCell, type CellResult } from './cell.ts';
 import { build, pruneBuildNodeModules } from './build.ts';
 import { checkHostContract, checkHostDeterminism, listHosts } from './hosts.ts';
 import { calibrateMachine, machineWarnings, readMachine } from './machine.ts';
-import { PROFILES, resolveCpuRate, type ProfileName } from './profiles.ts';
+import { achievedSlowdown, PROFILES, resolveCpuRate, type ProfileName } from './profiles.ts';
+import { analyze } from '@deplens/analyzer';
 import { launchBrowser, startMeasurementServer } from './session.ts';
 import { aaCoverage, mdeFromAA, median } from './stats.ts';
 import { readIndex, saveCellResult, saveInvalidCell } from './store.ts';
@@ -91,6 +92,10 @@ const { values, positionals } = parseArgs({
     'drift-tolerance': { type: 'string' },
     determinism: { type: 'boolean', default: false },
     repeats: { type: 'string', default: '3' },
+    // `analyze` (static, no browser)
+    pkg: { type: 'string', multiple: true },
+    'budget-ms': { type: 'string' },
+    features: { type: 'boolean', default: false },
   },
 });
 
@@ -168,9 +173,103 @@ async function cmdBuild(): Promise<void> {
   for (const p of res.packages.slice(0, 8)) console.log(`  ${String(p.bytesInOutput).padStart(8)}  ${p.name}`);
 }
 
+/**
+ * Static analysis of one or more candidates against a host — no browser, no measurement.
+ *
+ * This is the whole tier-2 pipeline (doc 06 §7.2) behind one command: install, isolated build,
+ * host build diff, feature extraction, prediction and verdict. Every number it prints carries its
+ * provenance, and the `ΔScript` line is `predicted` by the B3 placeholder until a model is trained.
+ */
+async function cmdAnalyze(): Promise<void> {
+  if (!values.host) throw new Error('--host is required for `analyze`');
+  if (!values.pkg?.length) {
+    throw new Error('--pkg is required, e.g. --pkg date-fns@4.1.0 (repeat it to compare candidates)');
+  }
+  const specCode = requireImport();
+  const specs = values.pkg.length === 1 ? [specCode] : specCode.split('|||').map((s) => s.trim());
+  if (specs.length !== values.pkg.length) {
+    throw new Error(
+      `Give one import spec per --pkg, separated by '|||'. Got ${values.pkg.length} packages and ${specs.length} specs.`,
+    );
+  }
+
+  // Use the machine's calibrated slowdown when there is one; otherwise the profile's target.
+  const profile = (values.profile ?? 'mid-tier-mobile') as ProfileName;
+  const machine = await readMachine(workRoot);
+  const target = PROFILES[profile].targetSlowdown;
+  const slowdown = machine ? achievedSlowdown(machine.calibration, target) : target;
+
+  const result = await analyze({
+    hostDir: resolve(repoRoot, values.host),
+    workRoot,
+    profile,
+    profileSlowdown: slowdown,
+    ...(values['budget-ms'] ? { budget: { scriptMs: Number(values['budget-ms']) } } : {}),
+    candidates: values.pkg.map((pkg, i) => ({
+      pkg,
+      spec: { code: specs[i]!, ...(values.lazy ? { placement: 'lazy' as const } : {}) },
+    })),
+    onProgress: (done, total, name) => {
+      if (!values.json) console.error(`  [${done}/${total}] ${name}`);
+    },
+  });
+
+  if (values.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.log(
+    `host ${result.host.name} (${result.host.framework}), baseline initial JS ${result.host.baselineMinBytes} B — ` +
+      `profile ${result.profile} at ${slowdown.toFixed(2)}× ${machine ? '(from this machine’s calibration)' : '(profile target; machine not calibrated)'}\n`,
+  );
+
+  const rankByName = new Map(result.ranking.map((r) => [r.name, r]));
+  for (const r of result.reports) {
+    const rank = rankByName.get(r.candidate.name);
+    console.log(`${r.candidate.name}@${r.candidate.version ?? '?'}  ${r.candidate.import}`);
+    console.log(
+      `  Δbytes      ${String(r.bytes.min.value).padStart(8)} min / ${String(r.bytes.gzip.value).padStart(7)} gzip / ${String(r.bytes.brotli.value).padStart(7)} br   [${r.bytes.min.provenance}]`,
+    );
+    if (r.bytes.sharedWithApp.length) console.log(`  shared      ${r.bytes.sharedWithApp.join(', ')} (already in the app)`);
+    if (r.bytes.newPackages.length) console.log(`  new pkgs    ${r.bytes.newPackages.join(', ')}`);
+    const iv = r.script.interval ?? [r.script.value, r.script.value];
+    console.log(
+      `  ΔScript     ${r.script.value.toFixed(1)} ms [${iv[0].toFixed(1)}, ${iv[1].toFixed(1)}]   [${r.script.provenance} · ${r.model.kind}]`,
+    );
+    console.log(`  Δnetwork    ${r.network.value.toFixed(0)} ms   [${r.network.provenance}: ${r.network.model}]`);
+    console.log(`  verdict     ${r.verdict.risk.toUpperCase()}${r.verdict.verifyRecommended ? ' — verify recommended' : ''}: ${r.verdict.reason}`);
+    if (r.outOfDistribution.outOfDistribution) for (const why of r.outOfDistribution.reasons) console.log(`  ⚠ ${why}`);
+    for (const w of r.why) console.log(`  why         ${w.text}`);
+    for (const a of r.advice) console.log(`  advice      ${a.text}`);
+    console.log(
+      `  features    ${Object.keys(r.features).length} across ${r.featureGroups.join('+')}  (schema v${result.schemaVersion})`,
+    );
+    if (rank) console.log(`  rank        ${rank.rank} of ${result.reports.length}${rank.tiedWithPrevious ? ' — no clear difference from the one above' : ''}`);
+    console.log(
+      `  took        install ${Math.round(r.timings.installMs)} ms, build ${Math.round(r.timings.buildMs)} ms, extract ${Math.round(r.timings.extractMs)} ms, total ${Math.round(r.timings.totalMs)} ms`,
+    );
+    for (const note of r.notes) console.log(`  note        ${note}`);
+    if (values.features) {
+      for (const [k, v] of Object.entries(r.features).sort(([a], [b]) => a.localeCompare(b))) {
+        console.log(`      ${k.padEnd(32)} ${String(v)}`);
+      }
+    }
+    console.log('');
+  }
+
+  if (result.reports.length > 1) {
+    console.log('ranking (cheapest first, by predicted ΔScript):');
+    for (const r of result.ranking) {
+      console.log(`  ${r.rank}. ${r.name}${r.tiedWithPrevious ? '  = no clear difference from the one above' : ''}`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   if (cmd === 'hosts') return cmdHosts();
   if (cmd === 'build') return cmdBuild();
+  if (cmd === 'analyze') return cmdAnalyze();
 
   if (cmd === 'clean') {
     const { pruned, failed } = await pruneBuildNodeModules(workRoot);

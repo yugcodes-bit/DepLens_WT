@@ -9,7 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "pnpm --filter @deplens/harness test",
+    "test": "pnpm -r --filter \"./packages/**\" test",
     "typecheck": "pnpm -r typecheck",
     "harness": "tsx packages/harness/src/cli.ts",
     "hosts": "tsx packages/harness/src/cli.ts hosts",
@@ -18,7 +18,14 @@
     "db:serve": "pnpm --filter @deplens/db serve",
     "db:migrate": "pnpm --filter @deplens/db migrate:local",
     "web": "pnpm --filter @deplens/web dev",
-    "test:web": "pnpm --filter @deplens/web test:e2e"
+    "test:web": "pnpm --filter @deplens/web test:e2e",
+    "analyze": "tsx packages/harness/src/cli.ts analyze",
+    "worker": "pnpm --filter @deplens/analyzer-service start",
+    "jobs": "pnpm --filter @deplens/analyzer-service jobs",
+    "test:ml": "cd ml && uv run pytest -q",
+    "test:all": "pnpm test && pnpm test:ml",
+    "ml:eval": "cd ml && uv run python scripts/evaluate.py",
+    "contract": "pnpm --filter @deplens/feature-schema contract"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

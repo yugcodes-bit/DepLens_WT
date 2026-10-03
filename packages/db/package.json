@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "PostgreSQL schema (Drizzle) for the DepLens research dataset and product tables \u2014 doc 06 \u00a76.",
+  "description": "PostgreSQL schema (Drizzle) for the DepLens research dataset and product tables — doc 06 §6.",
   "main": "src/index.ts",
   "scripts": {
     "generate": "drizzle-kit generate",
@@ -11,7 +11,8 @@
     "studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit -p .",
     "migrate:local": "tsx src/migrate-cli.ts",
-    "serve": "tsx src/serve-cli.ts"
+    "serve": "tsx src/serve-cli.ts",
+    "test": "echo \"(no unit tests in this package)\""
   },
   "dependencies": {
     "drizzle-orm": "^0.44.0",

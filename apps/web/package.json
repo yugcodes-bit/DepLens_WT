@@ -2,7 +2,7 @@
   "name": "@deplens/web",
   "version": "0.1.0",
   "private": true,
-  "description": "DepLens web app: accounts, projects, candidate comparison and verification (doc 06 \u00a73.1).",
+  "description": "DepLens web app: accounts, projects, candidate comparison and verification (doc 06 §3.1).",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -19,7 +19,9 @@
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zod": "^3.24.0"
+    "zod": "^3.24.0",
+    "@deplens/shared": "workspace:*",
+    "@deplens/features": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

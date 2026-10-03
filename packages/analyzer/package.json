@@ -1,0 +1,23 @@
+{
+  "name": "@deplens/analyzer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The static analysis pipeline: install, isolated build, host build diff, feature extraction and the B3 placeholder predictor. No browser (doc 06 §7.2).",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@deplens/bundler-kit": "workspace:*",
+    "@deplens/features": "workspace:*",
+    "@deplens/lockfile": "workspace:*",
+    "@deplens/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

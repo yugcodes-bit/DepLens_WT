@@ -3,18 +3,31 @@ name = "deplens-ml"
 version = "0.1.0"
 description = "DepLens: dataset, models, evaluation and inference service"
 requires-python = ">=3.11"
+
+# Core: what the dataset loader, splits, baselines, metrics, conformal intervals and the LightGBM
+# model actually import. Kept small so `uv sync` works on a slow connection and in CI — the
+# heavyweight extras below are needed by later phases, not by the pipeline's tests.
 dependencies = [
   "pandas>=2.2",
   "pyarrow>=16",
   "numpy>=1.26",
   "scikit-learn>=1.5",
   "lightgbm>=4.5",
-  "xgboost>=2.1",
+]
+
+[project.optional-dependencies]
+# P6: hyper-parameter search, the second model family (doc 08 §5 M2), TreeSHAP explanations and the
+# statistical tests (Wilcoxon + Holm, cluster bootstrap — doc 08 §8).
+research = [
   "optuna>=4.0",
+  "xgboost>=2.1",
   "shap>=0.46",
   "scipy>=1.13",
   "statsmodels>=0.14",
   "matplotlib>=3.9",
+]
+# P6/P7: the FastAPI prediction service (doc 08 §12).
+service = [
   "fastapi>=0.115",
   "pydantic>=2.8",
   "uvicorn>=0.30",
@@ -25,3 +38,17 @@ dev = ["pytest>=8", "ruff>=0.6"]
 
 [tool.ruff]
 line-length = 110
+
+[tool.ruff.lint]
+# E501 is covered by line-length; the rest are the defaults plus import ordering.
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["deplens_ml"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
