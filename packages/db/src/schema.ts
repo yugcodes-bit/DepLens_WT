@@ -42,6 +42,15 @@ export const buildStatus = pgEnum('build_status', ['ok', 'failed', 'invalid']);
 export const runArm = pgEnum('run_arm', ['a', 'b']);
 export const projectMode = pgEnum('project_mode', ['quick', 'full']);
 export const analysisStatus = pgEnum('analysis_status', ['queued', 'resolving', 'building', 'extracting', 'predicting', 'done', 'error']);
+/** Authorization roles, checked server-side on every request (FR-67). */
+export const userRole = pgEnum('user_role', ['user', 'researcher', 'admin']);
+/** What a one-time code is for (FR-61). */
+export const otpPurpose = pgEnum('otp_purpose', ['verify_email', 'login_step_up', 'change_email']);
+export const auditOutcome = pgEnum('audit_outcome', ['success', 'failure']);
+/** Which worker tier a job needs (doc 06 section 7.1). */
+export const jobTier = pgEnum('job_tier', ['ci', 'measurement']);
+export const jobKind = pgEnum('job_kind', ['analyze', 'measure']);
+export const jobStatus = pgEnum('job_status', ['queued', 'running', 'done', 'failed', 'cancelled']);
 
 // ---------------------------------------------------------------------------- research: what we measure
 
@@ -290,10 +299,155 @@ export const models = pgTable('model', {
   createdAt: now(),
 });
 
+// ---------------------------------------------------------------------------- accounts & security
+
+/**
+ * A registered user (FR-60). The password is only ever present as an Argon2id hash, and the e-mail is
+ * stored lower-cased so uniqueness is case-insensitive the way users expect.
+ */
+export const users = pgTable(
+  'user',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    email: text('email').notNull(),
+    /** Null until the e-mail OTP has been confirmed; an unverified user cannot sign in (FR-61). */
+    emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+    passwordHash: text('password_hash').notNull(),
+    name: text('name'),
+    role: userRole('role').notNull().default('user'),
+    /** Failed-login counter and lockout window (FR-66). */
+    failedLogins: integer('failed_logins').notNull().default(0),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    /** Opt-in: may this user's verified measurements join the public dataset (NFR-S2)? */
+    contributeMeasurements: boolean('contribute_measurements').notNull().default(false),
+    createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('user_email_uq').on(t.email)],
+);
+
+/**
+ * A server-side login session (FR-62 to FR-64). The browser only ever holds the cookie value - an
+ * opaque random string - so a session can be revoked instantly by deleting this row, which a
+ * stateless token could not offer.
+ */
+export const authSessions = pgTable(
+  'auth_session',
+  {
+    /** Hash of the cookie value: a database leak must not hand over live sessions. */
+    id: text('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** CSRF double-submit secret for this session (FR-71). */
+    csrfToken: text('csrf_token').notNull(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Idle expiry, pushed forward on use. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /** Absolute expiry, never extended. */
+    absoluteExpiresAt: timestamp('absolute_expires_at', { withTimezone: true }).notNull(),
+    createdAt: now(),
+  },
+  (t) => [index('auth_session_user_idx').on(t.userId), index('auth_session_expiry_idx').on(t.expiresAt)],
+);
+
+/** One-time codes, stored hashed and attempt-capped (FR-61, FR-70). */
+export const otpCodes = pgTable(
+  'otp_code',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    purpose: otpPurpose('purpose').notNull(),
+    codeHash: text('code_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt: now(),
+  },
+  (t) => [index('otp_user_purpose_idx').on(t.userId, t.purpose)],
+);
+
+/** Single-use password-reset tokens, stored hashed (FR-69, FR-70). */
+export const passwordResets = pgTable(
+  'password_reset',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt: now(),
+  },
+  (t) => [uniqueIndex('password_reset_token_uq').on(t.tokenHash)],
+);
+
+/** Security-relevant events (FR-72). Doubles as evidence for the Testing chapter. */
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Null for events on an address that does not resolve to an account. */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    event: text('event').notNull(),
+    outcome: auditOutcome('outcome').notNull(),
+    ip: text('ip'),
+    userAgent: text('user_agent'),
+    detail: jsonb('detail').$type<Record<string, unknown>>(),
+    createdAt: now(),
+  },
+  (t) => [index('audit_log_user_idx').on(t.userId), index('audit_log_event_idx').on(t.event)],
+);
+
+/**
+ * Work queued for a worker outside the web host (doc 06 section 7.3).
+ *
+ * There is no Redis on the free tiers, so this table *is* the queue. A worker claims a job with one
+ * atomic UPDATE ... WHERE id = (SELECT id FROM job WHERE status = 'queued' AND tier = $1
+ * ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *, so two workers can never take the
+ * same job. A job still running past leaseUntil is returned to the queue, which is also how a crashed
+ * campaign resumes (FR-51).
+ */
+export const jobs = pgTable(
+  'job',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: jobKind('kind').notNull(),
+    /** 'ci' = byte analysis, may run on a shared runner. 'measurement' = timing, quiet machine only. */
+    tier: jobTier('tier').notNull(),
+    analysisId: uuid('analysis_id').references(() => analyses.id, { onDelete: 'cascade' }),
+    candidateIdx: integer('candidate_idx'),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    status: jobStatus('status').notNull().default('queued'),
+    /** 0-100, polled by the UI for progress. */
+    progress: integer('progress').notNull().default(0),
+    progressMessage: text('progress_message'),
+    claimedBy: text('claimed_by'),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    leaseUntil: timestamp('lease_until', { withTimezone: true }),
+    attempts: integer('attempts').notNull().default(0),
+    error: text('error'),
+    result: jsonb('result').$type<Record<string, unknown>>(),
+    createdAt: now(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('job_claim_idx').on(t.status, t.tier, t.createdAt), index('job_analysis_idx').on(t.analysisId)],
+);
+
 // ---------------------------------------------------------------------------- product: what a user asks
 
 export const projects = pgTable('project', {
   id: uuid('id').primaryKey().defaultRandom(),
+  /** Owner. A user may read or modify only their own projects (FR-68). */
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name'),
   mode: projectMode('mode').notNull(),
   manifestHash: text('manifest_hash').notNull(),
   framework: text('framework'),
@@ -392,4 +546,24 @@ export const analysesRelations = relations(analyses, ({ one, many }) => ({
 export const predictionsRelations = relations(predictions, ({ one }) => ({
   analysis: one(analyses, { fields: [predictions.analysisId], references: [analyses.id] }),
   model: one(models, { fields: [predictions.modelId], references: [models.id] }),
+}));
+
+export const usersRelations = relations(users, ({ many }) => ({
+  sessions: many(authSessions),
+  otpCodes: many(otpCodes),
+  projects: many(projects),
+  auditLog: many(auditLog),
+}));
+
+export const authSessionsRelations = relations(authSessions, ({ one }) => ({
+  user: one(users, { fields: [authSessions.userId], references: [users.id] }),
+}));
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  user: one(users, { fields: [projects.userId], references: [users.id] }),
+  analyses: many(analyses),
+}));
+
+export const jobsRelations = relations(jobs, ({ one }) => ({
+  analysis: one(analyses, { fields: [jobs.analysisId], references: [analyses.id] }),
 }));

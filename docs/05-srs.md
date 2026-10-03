@@ -135,6 +135,40 @@ Priority: **M** must · **S** should · **C** could. Each FR has an acceptance c
 | FR-41 | `deplens compare <pkgA> <pkgB> …` | S | Ranked output |
 | FR-42 | Exit code 1 when verdict is "over budget" (CI use) | C | Tested in a sample GitHub workflow |
 
+### 4.5b Accounts, authentication & authorization (course-mandated — doc 04 §2.1)
+
+| ID | Requirement | P | AC |
+|---|---|---|---|
+| FR-60 | Register with email + password; password stored only as an **Argon2id** hash (never reversible) | M | The `users` row contains no plaintext or decryptable password; a wrong password is rejected |
+| FR-61 | Email ownership verified by a **6-digit OTP** sent to the address, valid 10 min, single use, max 5 attempts | M | An unverified account cannot sign in; a reused or expired OTP is rejected with a distinct message |
+| FR-62 | Login creates a **server-side session**; the browser receives only an opaque session id in an `httpOnly`, `Secure`, `SameSite=Lax` cookie | M | The cookie contains no user data; deleting the session row immediately invalidates the cookie |
+| FR-63 | Sessions expire after 7 days idle / 30 days absolute, and are rotated on privilege change | M | An expired session is rejected; the old id stops working after rotation |
+| FR-64 | Logout deletes the server-side session and clears the cookie; "log out everywhere" deletes all of the user's sessions | M | After logout the same cookie value is refused |
+| FR-65 | **CAPTCHA** on register, login and password-reset forms | M | A submission without a valid CAPTCHA token is rejected before any password check |
+| FR-66 | Rate limiting and lockout: 5 failed logins per account per 15 min, then a timed lock; per-IP limits on all auth endpoints | M | The 6th attempt is refused even with the correct password |
+| FR-67 | **Role-based authorization** — `user` (own projects), `researcher` (campaigns, dataset export), `admin` (queues, roles). Enforced **server-side on every request**, not only in the UI | M | A `user` calling a researcher-only endpoint gets 403 regardless of what the UI shows |
+| FR-68 | A user can read and modify only their own projects and analyses | M | Requesting another user's project id returns 404, not 403 (no existence leak) |
+| FR-69 | Password reset by emailed single-use token (30 min), which invalidates all existing sessions | S | The token cannot be reused; old sessions stop working |
+| FR-70 | **Sensitive data encrypted at rest** beyond hashing: OTP codes and reset tokens stored as hashes; uploaded project archives encrypted with a server key | M | The database contains no usable OTP, token or archive plaintext |
+| FR-71 | CSRF protection on every state-changing request (double-submit token or origin check) | M | A cross-origin POST with a valid session cookie is rejected |
+| FR-72 | **Audit log** of register, login, failed login, logout, password change, role change, verification-quota hit | S | Each event records user, timestamp, IP and outcome |
+| FR-73 | Account deletion removes personal data and anonymises any contributed measurements | S | The user row is gone; contributed sessions remain but carry no identifying field |
+
+### 4.5c Input validation (course-mandated — doc 04 §2.1)
+
+Validation runs **on both sides** from one shared Zod schema: in the browser for feedback, and again on
+the server, which is the only one that is trusted (C-1).
+
+| ID | Requirement | P | AC |
+|---|---|---|---|
+| FR-74 | **Required-field** validation on every form | M | Submitting an empty required field shows a field-level message and sends no request |
+| FR-75 | **Email-format** validation | M | `a@b` and `a b@c.com` are rejected; `a@b.co` is accepted |
+| FR-76 | **Compare** validation — password and confirm-password must match; password ≥ 10 chars with a strength check | M | A mismatch is reported on the confirm field |
+| FR-77 | **Range** validation — budget 1–10,000 ms, 1–10,000 KB; pairs 4–40; candidates 1–5 | M | Out-of-range values are rejected with the permitted range in the message |
+| FR-78 | **Number** validation — numeric fields reject non-numeric and non-finite input | M | `12a`, `NaN`, `1e400` are all rejected |
+| FR-79 | **Custom** validation — the import spec must parse as one or more ES import declarations, and the package name must be a valid npm name | M | `import {` is rejected with a syntax message; `../evil` is rejected as not an npm package |
+| FR-80 | Validation errors are announced accessibly (`aria-invalid`, `aria-describedby`, focus moved to the first error) | S | Screen-reader and keyboard-only paths reach every error message |
+
 ### 4.6 Research pipeline
 | ID | Requirement | P | AC |
 |---|---|---|---|
@@ -178,6 +212,22 @@ NFR-R1 Workers are idempotent and retry transient failures (max 3, exponential b
 
 ### 5.5 Usability
 NFR-U1 First-time user completes a Quick-mode analysis in ≤ 2 minutes without docs (tested with 5 users). NFR-U2 Every number shows its provenance: *exact*, *modeled*, *predicted*, or *measured*. NFR-U3 Plain-language explanations avoid jargon or link to a glossary.
+
+### 5.5b Responsiveness & accessibility (course-mandated)
+| ID | Requirement |
+|---|---|
+| NFR-U4 | Every page is usable at **360 px (mobile), 768 px (tablet), 1366 px (laptop) and 1920 px (desktop)** with no horizontal scrolling and no overlapping content |
+| NFR-U5 | Touch targets ≥ 44×44 px on mobile breakpoints; forms usable one-handed |
+| NFR-U6 | Data tables and the comparison forest plot degrade to a readable stacked layout below 768 px |
+| NFR-U7 | WCAG 2.1 AA contrast, full keyboard navigation, visible focus, and a text equivalent for every chart (extends UI-7) |
+
+### 5.5c Deployment topology (added 2026-10-02 — see doc 06 §7)
+| ID | Requirement |
+|---|---|
+| NFR-D1 | The web app and API are deployed on a free-tier host and are reachable without any local process running |
+| NFR-D2 | Byte-level analysis of an unseen package completes without a developer's machine (CI worker); it performs **no timing measurement**, so a shared runner does not violate NFR-REP3 |
+| NFR-D3 | Timing measurements run **only** on a registered quiet machine; the UI states which tier produced every number |
+| NFR-D4 | Secrets are provided as environment variables and never committed; the repository contains `.env.example` only |
 
 ### 5.6 Maintainability & portability
 NFR-M1 TypeScript `strict`, ESLint + Prettier; Python with ruff + mypy (lenient); ≥ 70% unit-test coverage on analyzer, trace parser and statistics modules. NFR-M2 `docker compose up` starts the whole stack. NFR-M3 Feature schema changes bump `schemaVersion` and invalidate cached features.

@@ -43,6 +43,29 @@ Goal: a **small set of features a frontend developer would actually use**, each 
 | F23 | Real-device farm measurements | 3 | 4 | 3 | 1 | 2 | 20 | **WON'T** as a feature — but do a **small real-device validation** (1 Android phone) for the paper if you have one |
 | F24 | webpack / Next.js / Angular project support | 4 | 1 | 1 | 1 | 2 | 14 | **WON'T (MVP)** — Vite + Quick mode first; add later |
 
+## 2.1 Platform & security features (course-mandated, added 2026-10-02)
+
+The scoring in §2 is deliberately research-weighted, so a feature that is mandatory for the course
+rubric can score low there and still be a MUST. These are mandated by the project guidelines
+(sessions, cookies, encryption, authentication, authorization, CAPTCHA, OTP, email verification,
+validation, responsiveness). Each one listed below **also** has a product reason, given in the last
+column — we are not adding anything purely to tick a box.
+
+| # | Feature | U | R | N | C | K | Score | Decision | Product reason it earns its place |
+|---|---|---|---|---|---|---|---|---|---|
+| F25 | **Accounts + email/password login** with server-side sessions in `httpOnly` cookies | 3 | 2 | 1 | 4 | 4 | 19 | **MUST (course)** | Saved projects and analysis history; an owner for opt-in dataset contribution |
+| F26 | **Email verification + OTP** on sign-up and on sensitive actions | 2 | 1 | 1 | 3 | 3 | 13 | **MUST (course)** | A verified address is what makes per-user verification quotas (NFR-S5) meaningful |
+| F27 | **CAPTCHA** on sign-up / login / password reset | 2 | 1 | 1 | 4 | 4 | 14 | **MUST (course)** | Verification runs are expensive machine time; bots must not be able to queue them |
+| F28 | **Role-based authorization** — `user` / `researcher` / `admin` | 3 | 3 | 1 | 4 | 4 | 21 | **MUST (course)** | Only researchers may launch campaigns or publish a model; only admins see the queue |
+| F29 | **Validation suite** — required, range, compare, email, number, custom (import-spec syntax) | 4 | 2 | 1 | 5 | 5 | 23 | **MUST (course)** | An invalid import spec silently produces a meaningless cell; validation is the first line of FR-34 |
+| F30 | **Responsive layouts** — mobile / tablet / laptop / desktop | 4 | 1 | 1 | 4 | 5 | 20 | **MUST (course)** | A tool about mobile performance that is unusable on a phone would be indefensible |
+| F31 | **Password reset** via emailed single-use token | 3 | 1 | 1 | 4 | 4 | 17 | **SHOULD (course)** | Expected of any account system; cheap once F26's mailer exists |
+| F32 | **Audit log** of security-relevant events (login, logout, failed attempts, role change) | 2 | 2 | 2 | 5 | 5 | 20 | **SHOULD (course)** | Doubles as evidence for the Testing chapter and for the Books-and-Records style requirement |
+
+**Explicitly not doing:** third-party OAuth (Google/GitHub sign-in). It would hide exactly the
+mechanisms the course asks us to implement — sessions, cookies, hashing, OTP — behind a provider.
+We implement our own so there is something to document and test.
+
 ## 3. Final feature set
 
 ### MUST (the MVP — demo-able and paper-supporting)
@@ -52,11 +75,14 @@ Goal: a **small set of features a frontend developer would actually use**, each 
 4. **F4 Why** — top 3–5 contributing factors in plain language.
 5. **F5 Compare** 2–5 alternatives, ranked (forest-plot of intervals), with "difference is within noise" when intervals overlap heavily.
 6. **F6 Profiles** — three calibrated presets.
+7. **F25–F30 Platform & security** (§2.1) — accounts with session cookies, email verification + OTP,
+   CAPTCHA, role-based authorization, the six-validator suite, and responsive layouts.
 
 ### SHOULD (second half of the semester)
 7. **F7 Verify** — real paired measurement on demand, auto-suggested when uncertain.
 8. **F9 Import-form advice** and **F10 alternative suggestions** (e18e + curated).
 9. **F11 CLI** and **F12 model card**.
+9b. **F31 password reset** and **F32 audit log** (§2.1).
 10. **F8 Breakdown** (measured always; predicted only if good enough).
 
 ### COULD (only if ahead of schedule)

@@ -9,12 +9,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "pnpm -r test",
+    "test": "pnpm --filter @deplens/harness test",
     "typecheck": "pnpm -r typecheck",
     "harness": "tsx packages/harness/src/cli.ts",
     "hosts": "tsx packages/harness/src/cli.ts hosts",
     "fixtures": "node research/fixtures/generate.mjs",
-    "phase0": "tsx research/experiments/phase0.ts"
+    "phase0": "tsx research/experiments/phase0.ts",
+    "db:serve": "pnpm --filter @deplens/db serve",
+    "db:migrate": "pnpm --filter @deplens/db migrate:local",
+    "web": "pnpm --filter @deplens/web dev",
+    "test:web": "pnpm --filter @deplens/web test:e2e"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

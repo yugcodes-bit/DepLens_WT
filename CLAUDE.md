@@ -20,23 +20,35 @@ DepLens predicts — and on demand measures — the **incremental browser runtim
   - Profiles resolved per machine from a measured calibration curve; drift abort (FR-33), invalid-cell
     detection (FR-34), trace + session storage with a per-cell resume key (FR-35, FR-51).
   - `packages/db`: Drizzle schema for all 14 tables of doc 06 §6, migration generated.
-  - 47 unit tests.
+  - 49 unit tests.
 - **Open P1 items:** 2 realistic OSS hosts (Conduit-style); the A/A exit criterion (≥ 10 A/A sessions
   per host, CI covering 0 in ≥ 90%) — **blocked on a quiet measurement machine**. Idle, the dev laptop
   reaches MDE₉₅ ≈ 1.3 ms with 100% A/A coverage; loaded, its calibration moves 14–52% between sweeps and
   A/A noise reaches ±4 ms, so dataset cells need the tuned machine.
-- Next: finish those, then Phase 2 (pilot, doc 09 §3) and Phase 3 (`bundler-kit`, `features`, `lockfile`).
+- **Phase 5 (web platform) — pulled forward, auth + shell done** (doc 09 §P5 has the table):
+  - `apps/web` (Next.js 15 App Router): landing, how-it-works, register, verify (OTP), login, forgot,
+    reset, dashboard, new project. Responsive at 360/768/1366/1920 px.
+  - Own authentication (doc 06 §8): Argon2id, server-side sessions in `httpOnly` cookies, hashed
+    single-use OTP and reset tokens, CSRF double-submit + origin check, self-hosted vector-stroke
+    CAPTCHA, per-IP and per-account rate limiting, audit log, roles enforced server-side.
+  - One Zod schema per form, validated in the browser **and** again on the server.
+  - **51 page/API test cases pass** (`pnpm test:web`); the app passes its own JS budget
+    (heaviest route 102.1 KB brotli of 150 KB, `pnpm --filter @deplens/web test:budget`).
+  - Deployment: Vercel + Neon + Resend + GitHub Actions, all free — see `docs/13-deployment-guide.md`.
+- Next: finish the open P1 items, then Phase 3 (`bundler-kit`, `features`, `lockfile`) so the analysis
+  UI and the CI worker have a feature vector to show, then Phase 2 (pilot, doc 09 §3).
 
 ## Repository layout (target — see doc 06 §5)
 ```
 packages/harness      measurement harness (TS)            ← exists
 packages/db           Postgres schema (Drizzle) + migrations ← exists
+apps/web              Next.js app: auth, projects, results        ← exists
 packages/shared       Zod schemas, profiles, risk rules   ← TODO P5
 packages/feature-schema feature-schema.json (TS+Python)   ← draft exists
 packages/bundler-kit  injector/builds/metafile diff       ← TODO P3 (split out of harness/build.ts)
 packages/features     AST + bundle + metadata features    ← TODO P3
 packages/lockfile     npm/pnpm/yarn lockfile parsing       ← TODO P3
-apps/web  apps/api  apps/cli  services/analyzer  services/measurer   ← TODO P5/P7
+apps/api  apps/cli  services/analyzer  services/measurer   ← TODO P5/P7
 research/hosts        host apps (inject marker + app-ready mark)
 research/fixtures     synthetic calibration packages (generate.mjs)
 research/experiments  validation & pilot experiments
@@ -60,6 +72,13 @@ pnpm harness run --host research/hosts/react --import "import { format } from 'd
 pnpm harness iso --import "import _ from 'lodash'" --dep lodash@4.17.21 --profile mid-tier-mobile   # C_iso on the empty host
 pnpm harness noise                   # A/A noise floor (MDE95) from stored sessions
 pnpm harness clean                   # prune node_modules from cached builds (run after a campaign)
+
+# --- web app (doc 13 has the full deployment guide) ---
+pnpm db:serve                        # local Postgres with nothing installed (PGlite behind a socket)
+pnpm db:migrate                      # apply the committed migrations to $DATABASE_URL
+pnpm web                             # next dev on :3000
+pnpm test:web                        # 51 page/API test cases (needs `DEPLENS_E2E=1 pnpm dev -p 3111`)
+pnpm --filter @deplens/web test:budget   # NFR-P5: initial JS per route vs the 150 KB brotli budget
 
 cd packages/db && npx drizzle-kit generate    # regenerate the migration after a schema change
 cd packages/harness && npx tsx ../../research/experiments/phase0.ts   # Phase 0 validation (≈35 min)
@@ -102,3 +121,17 @@ Chromium: Playwright's bundled Chromium is used; set `DEPLENS_CHROMIUM=/path/to/
   ≈4.8× on the Phase 0 container. Always resolve the rate from the machine's calibration curve — and
   **calibrate the machine idle**: under load the same laptop reported 8.4× at rate 4 and resolved every
   profile to the wrong rate.
+
+## Web app rules
+- **One driver for the database, everywhere**: the app always speaks Postgres over the wire (`pg`).
+  Local dev points `DATABASE_URL` at the PGlite socket server (`pnpm db:serve`) — never embed PGlite in
+  Next, its WASM loader breaks on Next's `URL` shim. The local server serves **one connection**, so the
+  pool is capped at 1 for it.
+- **Validate twice, from one schema.** Every form has one Zod schema in `apps/web/lib/validation.ts`,
+  run in the browser for feedback and again in the route handler, which is the only trusted side.
+- **Never leak whether an account exists.** Login, registration, reset and resend all answer
+  identically for a known and an unknown address (see `GENERIC_LOGIN_FAILURE`).
+- **CAPTCHA must not be text.** The answer is drawn as vector strokes; an SVG `<text>` element would
+  put it in the markup for any bot to read.
+- `DEPLENS_E2E=1` makes `/api/captcha` return the answer so the test script can submit forms. It is
+  ignored when `NODE_ENV=production`; never set it on a deployment.

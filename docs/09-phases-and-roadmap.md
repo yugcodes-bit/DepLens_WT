@@ -70,7 +70,40 @@ With 3 people, merge Analysis into Measurement + Web.
 - Secondary-profile subset; isolated sessions; (optional) real-phone subset.
 - **Exit:** ≥ 2,000 valid cells (target 5,000); A/A stable across days; dataset v1 exported with hash + data dictionary.
 
-### P5 — Web platform MVP · Weeks 5–9 (27 Oct – 30 Nov), parallel
+### P5 — Web platform MVP · **pulled forward to start 2 Oct 2026**, runs in parallel with P2–P4
+
+**Why it moved:** the course guidelines require a *deployed* full-stack system with authentication and
+responsive UI (doc 04 §2.1, doc 05 §4.5b/4.5c). That is a hard deliverable, it is independent of the
+measurement campaign, and the campaign is itself blocked on a quiet machine. Building it now also gives
+the product a live URL long before the ML model exists — wired to the exact-Δbytes baseline (B3) as the
+placeholder predictor, exactly as this phase always intended.
+
+**Added scope (course-mandated):** accounts, Argon2id passwords, server-side sessions in `httpOnly`
+cookies, email verification + OTP, CAPTCHA, password reset, role-based authorization, the six-validator
+suite, audit log, responsive layouts at 360/768/1366/1920 px, and a free-tier deployment
+(Vercel + Neon + GitHub Actions worker — doc 06 §7).
+
+
+**Status 2 Oct 2026 — auth and app shell done, deployment-ready:**
+| P5 item | State |
+|---|---|
+| Accounts, Argon2id passwords, server-side sessions in httpOnly cookies | ✅ FR-60, FR-62–FR-64 |
+| Email verification by OTP (hashed, single-use, attempt-capped) | ✅ FR-61 |
+| CAPTCHA — self-hosted, drawn as vector strokes so the answer is not in the markup | ✅ FR-65 |
+| Rate limiting + account lockout (per IP from the audit log, per account on the user row) | ✅ FR-66 |
+| Role-based authorization (`user`/`researcher`/`admin`), enforced server-side | ✅ FR-67, FR-68 |
+| Password reset (single-use token, kills all sessions) | ✅ FR-69 |
+| Encryption at rest beyond hashing; CSRF double-submit + origin check; audit log | ✅ FR-70–FR-72 |
+| Six-validator suite, shared browser/server from one Zod schema | ✅ FR-74–FR-80 |
+| Responsive shell at 360/768/1366/1920 px, WCAG focus/contrast/aria | ✅ NFR-U4–U7 |
+| Pages: landing, how-it-works, register, verify, login, forgot, reset, dashboard, new project | ✅ |
+| Project intake (Quick mode: manifest hash + framework detection) | ✅ FR-01, FR-03 |
+| **Tests** | ✅ 51 page/API test cases pass (`pnpm test:web`); bundle budget PASS (`pnpm --filter @deplens/web test:budget`) |
+| **NFR-P5 — our own JS budget** | ✅ heaviest route 102.1 KB brotli of a 150 KB budget |
+| Analysis UI (results cards, compare view, forest plot), Verify flow | ⏳ next, once P3 can produce features |
+| GitHub Actions byte-analysis worker | ⏳ workflow lands with P3 |
+| Account deletion / data export (FR-73) | ⏳ |
+
 - API (Fastify, Zod, OpenAPI), BullMQ queues, analyzer worker, SSE progress.
 - UI: New Analysis (Quick + Full), Results cards with provenance badges, Compare view (forest plot). Initially wired to **B3 (in-context bytes) baseline** as a placeholder predictor so the product works before ML is ready.
 - Sandbox container for untrusted installs/builds.

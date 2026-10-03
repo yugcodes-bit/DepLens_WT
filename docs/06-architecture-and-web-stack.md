@@ -322,11 +322,87 @@ disk (`packages/harness/src/store.ts`), and the campaign runner promotes stored 
 
 ## 7. Deployment
 
-- **Dev:** `docker compose up` → postgres, redis, minio, api, web, analyzer, ml. Measurer runs **natively** on the measurement machine (`pnpm --filter measurer start`) connected to the same Redis/Postgres.
-- **Demo:** single VM for web/api/analyzer/ml; measurement on the team's quietest desktop.
-- Environment variables documented in `.env.example`; secrets never baked into images.
+### 7.1 Three tiers (decided 2026-10-02 — see research log)
 
-## 8. Security design (untrusted npm code)
+Timing measurement needs a real browser, arbitrary package installs, and above all a **quiet machine**
+(we measured A/A noise of ±4 ms on a busy machine versus ±0.3 ms idle). No free host provides that, so
+the system is split by *what kind of number* each tier produces, not by convenience.
+
+| Tier | Runs on | Produces | Up when |
+|---|---|---|---|
+| **1 — Web app + API** | Vercel free tier (Next.js App Router, Node runtime) + **Neon** free Postgres | Auth, projects, catalogue of already-analysed packages, comparisons, charts, model card, dataset download. Serves stored `exact` / `predicted` numbers. | always |
+| **2 — Byte-analysis worker** | **GitHub Actions** (free, unlimited minutes on a public repo), triggered by `repository_dispatch` and a 5-minute cron sweep of the job queue | For a package nobody has analysed: install (`--ignore-scripts`) → build baseline + treatment → **exact Δbytes**, added-code features, and an ML prediction. 1–2 min per job. | always |
+| **3 — Measurement worker** | A registered **quiet machine**, started on demand (`pnpm measurer`) | `measured` numbers: the paired A/B Chromium session behind **Verify**, and all dataset collection. Concurrency 1. | when started |
+
+Why tier 2 on shared CI does not break NFR-REP3 / hard rule 1: byte analysis is **deterministic**. The
+same build produces the same byte count on a busy runner and an idle one. The rule bans shared machines
+for *timing*, and timing lives only in tier 3. Every number in the UI carries the tier that produced it.
+
+This split is also the product thesis: answer instantly from what is known, and spend a real
+measurement only on the case too uncertain to decide — the predict-then-verify workflow of RQ4.
+
+### 7.2 Topology
+
+```mermaid
+flowchart TB
+  subgraph T1["Tier 1 — always on (free)"]
+    WEB["Next.js app + API routes<br/>Vercel"]
+    DB[("Neon Postgres<br/>users - sessions - projects<br/>analyses - jobs - dataset")]
+    MAIL["Transactional email<br/>OTP - verification - reset"]
+  end
+  subgraph T2["Tier 2 — always on (free)"]
+    GHA["GitHub Actions worker<br/>install - build - diff - features - predict<br/>NO timing"]
+  end
+  subgraph T3["Tier 3 — on demand"]
+    MEAS["Measurement worker<br/>Playwright + Chromium + CDP<br/>quiet machine, concurrency 1"]
+  end
+  USER([Developer]) -->|HTTPS| WEB
+  WEB --> DB
+  WEB --> MAIL
+  WEB -->|repository_dispatch| GHA
+  GHA -->|claim job - write result| DB
+  MEAS -->|poll job - write label + trace| DB
+  WEB -->|"Verify" job| DB
+```
+
+### 7.3 Jobs instead of a queue server
+
+Redis/BullMQ (§2) stays the design for a self-hosted deployment, but the free tiers have no Redis and
+the workers are outside the web host. Tier 1 therefore writes a **`job` row** in Postgres and workers
+**claim** it with `UPDATE ... SET status='running' WHERE status='queued' ... RETURNING` (a single atomic
+statement, so two workers cannot take the same job). Progress is a `job.progress` column the UI polls;
+SSE (§2) is used where the worker and API share a process. A job abandoned in `running` for more than
+its lease is returned to `queued`, which is also how a crashed campaign resumes (FR-51).
+
+### 7.4 Local development
+
+No Docker or local Postgres is required: dev points `DATABASE_URL` at a **Neon branch** of the same
+schema, so dev and production cannot drift. The harness itself needs no database at all — it stores
+sessions on disk (`packages/harness/src/store.ts`) — so measurement work continues even with no network.
+Emails print to the console in dev instead of being sent.
+
+- Environment variables documented in `.env.example`; secrets never baked into images or committed.
+
+## 8. Authentication & session design (doc 05 §4.5b)
+
+Own implementation, not a third-party identity provider: the mechanisms are what the course requires us
+to demonstrate, and hiding them behind OAuth would leave nothing to document or test.
+
+| Concern | Decision | Why |
+|---|---|---|
+| Password storage | **Argon2id** (memory-hard), per-password salt, parameters recorded | bcrypt is acceptable; Argon2id is the current recommendation and is tunable |
+| Session transport | Opaque 256-bit random id in an `httpOnly` + `Secure` + `SameSite=Lax` cookie | The cookie carries **no** user data, so it cannot be read or tampered with client-side |
+| Session storage | Server-side `session` row (user, created, last seen, expiry, IP, user-agent) | Enables instant revocation and "log out everywhere" — impossible with a stateless JWT |
+| Why not JWT | A signed token cannot be revoked before expiry | Revocation matters more than statelessness at this scale |
+| Expiry | 7 days idle, 30 days absolute, rotated on privilege change | Limits damage from a stolen cookie |
+| OTP / reset tokens | Random code, stored **hashed**, 10 min / 30 min TTL, single use, attempt-capped | A database leak must not yield usable codes |
+| CSRF | Double-submit token on state-changing requests + origin check | `SameSite=Lax` alone does not cover every case |
+| CAPTCHA | Challenge on register / login / reset | Verification runs cost real machine time; bots must not queue them |
+| Authorization | Role on the user row, checked **server-side in every route handler** | UI-only checks are not security |
+| Transport | HTTPS everywhere (Vercel default), HSTS | — |
+
+
+## 9. Security design (untrusted npm code)
 
 | Threat | Mitigation |
 |---|---|
@@ -336,7 +412,7 @@ disk (`packages/harness/src/store.ts`), and the campaign runner promotes stored 
 | Resource exhaustion | CPU/mem/pids/time limits; archive size and file-count caps; zip-slip guard |
 | Data leakage of user projects | 24 h retention; Quick mode/CLI avoid uploading source |
 
-## 9. Key design decisions (ADR summary)
+## 10. Key design decisions (ADR summary)
 
 1. **Predict from build outputs, not only package metadata** — exact in-context Δbytes is cheap and is the strongest baseline; ignoring it would make the model look better than it is against weak baselines.
 2. **Delta measurement, not attribution** — we measure whole-page cost with and without the import instead of attributing trace events to package URLs, because bundling merges package code into app chunks.

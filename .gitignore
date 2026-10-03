@@ -11,3 +11,11 @@ __pycache__/
 ml/reports/*
 !ml/reports/.gitkeep
 research/fixtures/packages/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# local database (PGlite data dir lives under .work/, already ignored)

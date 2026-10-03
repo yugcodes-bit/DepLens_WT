@@ -8,6 +8,13 @@
       "when": 1790823944519,
       "tag": "0000_premium_mephisto",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790883225073,
+      "tag": "0001_new_ulik",
+      "breakpoints": true
     }
   ]
 }

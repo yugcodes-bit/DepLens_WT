@@ -1,0 +1,165 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens (NFR-U7: WCAG 2.1 AA contrast in both themes).
+ *
+ * One palette, defined once, so a provenance badge or a verdict chip cannot drift between pages.
+ * The provenance colours are semantic, not decorative — every number in this product carries one of
+ * exact / modeled / predicted / measured (NFR-U2), and the colour is part of that meaning.
+ */
+@theme {
+  --color-ink: oklch(0.21 0.02 255);
+  --color-ink-soft: oklch(0.44 0.02 255);
+  --color-ink-faint: oklch(0.6 0.015 255);
+  --color-surface: oklch(1 0 0);
+  --color-surface-2: oklch(0.975 0.004 255);
+  --color-line: oklch(0.9 0.008 255);
+  --color-brand: oklch(0.52 0.17 262);
+  --color-brand-soft: oklch(0.95 0.03 262);
+
+  /* provenance */
+  --color-exact: oklch(0.48 0.13 160);
+  --color-modeled: oklch(0.52 0.12 230);
+  --color-predicted: oklch(0.55 0.14 290);
+  --color-measured: oklch(0.47 0.16 25);
+
+  /* verdicts */
+  --color-good: oklch(0.5 0.14 150);
+  --color-warn: oklch(0.62 0.15 75);
+  --color-bad: oklch(0.52 0.19 25);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-ink: oklch(0.95 0.01 255);
+    --color-ink-soft: oklch(0.76 0.015 255);
+    --color-ink-faint: oklch(0.6 0.015 255);
+    --color-surface: oklch(0.19 0.015 258);
+    --color-surface-2: oklch(0.24 0.018 258);
+    --color-line: oklch(0.34 0.02 258);
+    --color-brand: oklch(0.72 0.15 262);
+    --color-brand-soft: oklch(0.3 0.06 262);
+
+    --color-exact: oklch(0.72 0.14 160);
+    --color-modeled: oklch(0.74 0.12 230);
+    --color-predicted: oklch(0.76 0.13 290);
+    --color-measured: oklch(0.74 0.15 35);
+
+    --color-good: oklch(0.74 0.14 150);
+    --color-warn: oklch(0.8 0.14 85);
+    --color-bad: oklch(0.7 0.16 25);
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-ink: oklch(0.95 0.01 255);
+  --color-ink-soft: oklch(0.76 0.015 255);
+  --color-ink-faint: oklch(0.6 0.015 255);
+  --color-surface: oklch(0.19 0.015 258);
+  --color-surface-2: oklch(0.24 0.018 258);
+  --color-line: oklch(0.34 0.02 258);
+  --color-brand: oklch(0.72 0.15 262);
+  --color-brand-soft: oklch(0.3 0.06 262);
+  --color-exact: oklch(0.72 0.14 160);
+  --color-modeled: oklch(0.74 0.12 230);
+  --color-predicted: oklch(0.76 0.13 290);
+  --color-measured: oklch(0.74 0.15 35);
+  --color-good: oklch(0.74 0.14 150);
+  --color-warn: oklch(0.8 0.14 85);
+  --color-bad: oklch(0.7 0.16 25);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* NFR-U4: no horizontal scrolling at any breakpoint. */
+  overflow-x: hidden;
+}
+
+/* NFR-U7: a visible focus ring everywhere, never removed. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect a reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  .dl-card {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line);
+    border-radius: 0.875rem;
+  }
+
+  .dl-input {
+    width: 100%;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line);
+    border-radius: 0.5rem;
+    /* NFR-U5: 44px minimum touch target on mobile. */
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem; /* 16px stops iOS Safari zooming on focus */
+  }
+
+  .dl-input[aria-invalid='true'] {
+    border-color: var(--color-bad);
+  }
+
+  .dl-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.125rem;
+    border-radius: 0.625rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .dl-btn-primary {
+    background: var(--color-brand);
+    color: oklch(1 0 0);
+  }
+
+  .dl-btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .dl-btn-ghost {
+    border: 1px solid var(--color-line);
+    color: var(--color-ink);
+    background: transparent;
+  }
+
+  /* Provenance badge — the visual half of NFR-U2. */
+  .dl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.4rem;
+    border-radius: 0.3rem;
+    border: 1px solid currentColor;
+  }
+}

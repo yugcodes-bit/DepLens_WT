@@ -17,6 +17,8 @@ Context-aware prediction of the browser runtime cost of npm dependencies. Web-te
 | 08 | [ML methodology](08-ml-methodology.md) — features, baselines, models, splits, metrics, statistics, serving | before touching `ml/` |
 | 09 | [Phases & roadmap](09-phases-and-roadmap.md) — weekly plan, exit criteria, venues & deadlines, risks | planning |
 | 11 | [Paper plan](11-paper-plan.md) — outline, figures, threats to validity | writing |
+| 12 | [How it works, in plain English](12-how-it-works-simple.md) — inputs/outputs, every module as Input→Process→Output, a worked example, what runs where | explaining the project to anyone; source for the Methodology chapter |
+| 13 | [Deployment guide](13-deployment-guide.md) — free-tier setup (Vercel + Neon + Resend + Actions), local dev with no installs, pre-demo checklist | deploying |
 | — | [Research log](research-log.md) — dated decisions & experiment results (append-only) | always |
 
 ## One-paragraph summary
