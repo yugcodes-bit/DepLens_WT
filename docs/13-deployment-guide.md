@@ -42,8 +42,7 @@ cd apps/web && DEPLENS_E2E=1 pnpm dev -p 3111
 pnpm test:web
 ```
 
----
-
+--
 ## 2. Create the database (Neon)
 
 1. Sign up at <https://neon.tech> with GitHub.
